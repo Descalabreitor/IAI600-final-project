@@ -1,3 +1,5 @@
 .ipynb_checkpoints/
 models-and-hyperparameters-v2
 
+__pycache__/
+data/raw/
