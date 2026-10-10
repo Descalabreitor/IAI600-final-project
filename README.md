@@ -2,7 +2,7 @@
 
 ## Main Ideas
 
-- target: Price change (in percentage) each hour (range -1 -> whatever)
+- Target: Price change (in percentage) each hour (range -1 -> whatever)
 - Features (hourly):
     - Volume Traded
     - Open Price

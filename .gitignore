@@ -1,0 +1,5 @@
+# Ignore the data CSV file in the repository
+btcusd_1-min_data.csv
+.macro_cache/
+.vscode/
+.__pycache__/
