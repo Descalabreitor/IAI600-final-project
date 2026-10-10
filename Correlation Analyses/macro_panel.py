@@ -16,6 +16,11 @@ Differences compared with the old macro_features.py:
     pit=True  -> alignment by availability date (observation + publication lag),
     which is the correct one if you want to claim that X "leads" BTC.
 
+Usage:
+    macro = load_raw()                                   # download / read cache ONCE
+    panels, meta = build_panels(close, macro)            # close = {"D": Series, "W": ..., "ME": ...}
+    panels_pit, _ = build_panels(close, macro, pit=True, freqs=("D", "W"))
+
 Dependencies: pandas, numpy, yfinance
 """
 from __future__ import annotations
@@ -23,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import time
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -179,21 +185,32 @@ def _transform(x: pd.Series, how: str) -> pd.Series:
     raise ValueError(how)
 
 
-def build_levels(pit: bool = False, data_start: str = "2012-01-01",
-                 refresh_hours: float = 24, fred_specs=None, yf_specs=None):
-    """Download everything; return (levels indexed by availability, meta, failures)."""
+# components of the derived NetLiquidity series
+NET_LIQ_PARTS = ("FedBalanceSheet", "TGA", "ON_RRP")
+
+
+@dataclass
+class MacroData:
+    """Raw downloaded series (indexed by observation date) and their metadata."""
+    raw: dict
+    meta: pd.DataFrame      # name, source, id, native, lag, transform, group
+    failed: list
+
+
+def load_raw(data_start: str = "2012-01-01", refresh_hours: float = 24,
+             fred_specs=None, yf_specs=None) -> MacroData:
+    """Download (or read from cache) every series once. Failed series are skipped."""
     fred_specs = FRED_SPECS if fred_specs is None else fred_specs
     yf_specs = YF_SPECS if yf_specs is None else yf_specs
-    levels, meta, failed = {}, [], []
+    raw, meta, failed = {}, [], []
 
     for name, (sid, lag, native, tf, group) in fred_specs.items():
         try:
-            s = load_fred(sid, refresh_hours)
+            raw[name] = load_fred(sid, refresh_hours)
         except Exception as e:
             failed.append((name, str(e)[:90]))
             continue
-        levels[name] = _to_available(s, native, lag, pit)
-        meta.append(dict(name=name, source="FRED", id=sid, native=native,
+        meta.append(dict(name=name, source="FRED", id=sid, native=native, lag=lag,
                          transform=tf, group=group))
 
     try:
@@ -205,64 +222,78 @@ def build_levels(pit: bool = False, data_start: str = "2012-01-01",
         if tkr not in px.columns or px[tkr].dropna().empty:
             failed.append((name, f"no data for {tkr}"))
             continue
-        levels[name] = _to_available(px[tkr].dropna(), "D", 1, pit)
-        meta.append(dict(name=name, source="Yahoo", id=tkr, native="D",
+        raw[name] = px[tkr].dropna()
+        meta.append(dict(name=name, source="Yahoo", id=tkr, native="D", lag=1,
                          transform="logret", group=group))
 
-    # Net liquidity = Fed balance sheet - TGA - ON RRP (in USD billions).
-    # Units on FRED: WALCL and WTREGEN in millions, RRPONTSYD in billions
-    # (check that the order of magnitude comes out ~ 5,000-6,500 in 2022-2024).
-    parts = ("FedBalanceSheet", "TGA", "ON_RRP")
-    if all(k in levels for k in parts):
-        d = pd.concat({k: levels[k] for k in parts}, axis=1).sort_index().ffill()
-        d["ON_RRP"] = d["ON_RRP"].fillna(0)      # before Sep-2013 the facility did not exist
-        net = (d["FedBalanceSheet"] / 1e3 - d["TGA"] / 1e3 - d["ON_RRP"]).dropna()
-        levels["NetLiquidity"] = net
+    # Net liquidity = Fed balance sheet - TGA - ON RRP (derived in align_levels).
+    if all(k in raw for k in NET_LIQ_PARTS):
         meta.append(dict(name="NetLiquidity", source="derived", id="WALCL-WTREGEN-RRP",
-                         native="W", transform="logret", group="liquidity"))
+                         native="W", lag=0, transform="logret", group="liquidity"))
 
     if failed:
         print("Skipped series:", *[f"  {n}: {m}" for n, m in failed], sep="\n")
-    return levels, pd.DataFrame(meta), failed
+    return MacroData(raw, pd.DataFrame(meta), failed)
 
 
-def build_panel(btc_close: pd.Series, freq: str = "D", pit: bool = False,
-                start: str = "2017-01-01", weekdays_only: bool = True, **kw):
-    """Panel (BTC + transformed macro variables) at frequency D, W or ME.
+def align_levels(macro: MacroData, pit: bool) -> dict:
+    """Index every series by the moment it is available (see _to_available)."""
+    spec = macro.meta.set_index("name")
+    levels = {n: _to_available(s, spec.at[n, "native"], int(spec.at[n, "lag"]), pit)
+              for n, s in macro.raw.items()}
+    if "NetLiquidity" in spec.index:
+        # Units on FRED: WALCL and WTREGEN in millions, RRPONTSYD in billions of USD
+        # (check that the result is ~ 5,000-6,500 billion in 2022-2024).
+        d = pd.concat({k: levels[k] for k in NET_LIQ_PARTS}, axis=1).sort_index().ffill()
+        d["ON_RRP"] = d["ON_RRP"].fillna(0)      # before Sep-2013 the facility did not exist
+        levels["NetLiquidity"] = (d["FedBalanceSheet"] / 1e3 - d["TGA"] / 1e3 - d["ON_RRP"]).dropna()
+    return levels
 
-    btc_close : Close series already resampled to that frequency (df_BTC_daily['Close'],
-                df_BTC_weekly['Close'] or df_BTC_monthly['Close'] from the notebook).
+
+def build_panels(btc_close: dict, macro: MacroData, pit: bool = False, freqs=None,
+                 start: str = "2017-01-01", weekdays_only: bool = True, variables=None):
+    """Panels (BTC + transformed macro variables) at frequency D, W and/or ME.
+
+    btc_close : {"D": Series, "W": Series, "ME": Series} of BTC Close, already
+                resampled (label = last calendar day of the period).
+    macro     : result of load_raw().
     pit       : False = contemporaneous (by observation date);
                 True  = by availability date (for lead-lag / "leads").
+    freqs     : subset of btc_close to build (default: all).
+    variables : optional list of macro variables to keep (default: all).
     weekdays_only (only freq='D'): drops Saturdays and Sundays, so that BTC's Monday
                 return is Friday->Monday, just like the equity return.
                 With a full calendar, equities are 0 on weekends while BTC moves,
                 which artificially attenuates correlations.
-    Variables whose native frequency is slower than `freq` are excluded (e.g. CPI is
-    not in the daily or weekly panel).
-    Returns (panel, meta).
+    Variables whose native frequency is slower than the panel's are excluded (e.g. CPI
+    is not in the daily or weekly panel).
+    Returns ({freq: panel}, meta indexed by variable name).
     """
-    if freq not in TARGET_DAYS:
-        raise ValueError("freq must be 'D', 'W' or 'ME'")
-    btc = btc_close.dropna()
-    if freq == "D" and weekdays_only:
-        btc = btc[btc.index.dayofweek < 5]
-    # With resample D/W/ME the label is the last calendar day of the period, and the
-    # period ends 1 day later at 00:00.
-    end = btc.index + pd.Timedelta(days=1)
+    freqs = list(btc_close) if freqs is None else list(freqs)
+    levels = align_levels(macro, pit)
+    meta = macro.meta
+    if variables is not None:
+        meta = meta[meta["name"].isin(variables)]
 
-    levels, meta, _ = build_levels(pit=pit, **kw)
-    logp = np.log(btc)
-    cols = {"BTC_ret": logp.diff(), "BTC_absret": logp.diff().abs()}
-    kept = []
-    for m in meta.to_dict("records"):
-        if NATIVE_DAYS[m["native"]] > TARGET_DAYS[freq]:
-            continue
-        x = levels[m["name"]].reindex(end, method="ffill", tolerance=STALE_TOL[m["native"]])
-        x.index = btc.index
-        cols[m["name"]] = _transform(x, m["transform"])
-        kept.append(m["name"])
+    panels, kept = {}, set()
+    for freq in freqs:
+        if freq not in TARGET_DAYS:
+            raise ValueError("freq must be 'D', 'W' or 'ME'")
+        btc = btc_close[freq].dropna()
+        if freq == "D" and weekdays_only:
+            btc = btc[btc.index.dayofweek < 5]
+        # With resample D/W/ME the label is the last calendar day of the period, and
+        # the period ends 1 day later at 00:00.
+        end = btc.index + pd.Timedelta(days=1)
+        logp = np.log(btc)
+        cols = {"BTC_ret": logp.diff(), "BTC_absret": logp.diff().abs()}
+        for m in meta.to_dict("records"):
+            if NATIVE_DAYS[m["native"]] > TARGET_DAYS[freq]:
+                continue
+            x = levels[m["name"]].reindex(end, method="ffill", tolerance=STALE_TOL[m["native"]])
+            x.index = btc.index
+            cols[m["name"]] = _transform(x, m["transform"])
+            kept.add(m["name"])
+        panels[freq] = pd.DataFrame(cols).loc[pd.Timestamp(start):]
 
-    panel = pd.DataFrame(cols).loc[pd.Timestamp(start):]
-    meta = meta[meta["name"].isin(kept)].set_index("name")
-    return panel, meta
+    return panels, macro.meta[macro.meta["name"].isin(kept)].set_index("name")
