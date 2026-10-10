@@ -1,5 +1,10 @@
 .ipynb_checkpoints/
 models-and-hyperparameters-v2
-
 __pycache__/
+.vscode/
+
+# data: raw downloads and caches (re-created by the scripts)
 data/raw/
+btcusd_1-min_data.csv
+.macro_cache/
+.btc_cache/
