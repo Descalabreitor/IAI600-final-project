@@ -34,6 +34,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+MAX_ATEMPTS = 3
+
 CACHE = Path(".macro_cache")
 
 # approximate number of days of each native / target frequency
@@ -124,7 +126,7 @@ def load_fred(series_id: str, max_age_h: float = 24) -> pd.Series:
     if not _fresh(p, max_age_h):
         url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
         ok, last = False, None
-        for attempt in range(3):
+        for attempt in range(MAX_ATEMPTS):
             try:
                 pd.read_csv(url, index_col=0, parse_dates=True, na_values=".").to_csv(p)
                 ok = True
