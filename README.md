@@ -283,25 +283,21 @@ Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always u
 
 ## 🧪 Aditional model work
 
-### Filip: SVR, ensembles, Binance data and extensions of version 3
+### Filip: extensions of version 3 and trading simulation
 
 | File | Content |
 |---|---|
-| `svr-voting-ensemble.ipynb` | Linear and RBF SVR and an averaging ensemble (Ridge + Random Forest + Gradient Boosting + Linear SVR) on the 24 hourly returns, version-1 setup. |
-| `hourly-move-size.ipynb` | Size of each hourly move (\|return\|) with extra per-hour features, wide format. |
-| `binance-features.ipynb` | Binance BTC order flow and ETH attributes in 7 combinations × 5 models on the 24 hourly returns, plus direction metrics. |
 | `v3-extensions.ipynb` | On top of version 3: Binance attributes for the move size, monthly refitting with recency weights, conformal calibration of the 80% ranges, next-hour direction (≈2 h to run). |
 | `trading-simulation.ipynb` | 10,000 USD traded on the forecasts over the test block (next-hour direction, volatility targeting) with real fees, vs. buy and hold. |
 | `download_binance.py` | Downloads Binance 1-minute klines (BTCUSDT, ETHUSDT) from data.binance.vision, checks SHA-256, aggregates to `data/binance_*_1h.csv.gz`. |
 | `binance_features.py` | Loading of the Binance hourly data and the order-flow / ETH / ETH-vs-BTC attributes. |
-| `shared_cells.py` | Runs the setup cells of Alberto's version 1 or version 3 notebook inside another notebook (no copied code). |
+| `shared_cells.py` | Runs the setup cells of Alberto's version 3 notebook inside another notebook (no copied code). |
 
 **Main results (version-3 blocks, test Jul 2024 → Oct 2026):**
 - **Refitting every month** with sample weights halving every 12 months raises the hourly move-size R² from **0.124 to 0.148** (95% CI of the gain +0.018 to +0.029, better in 28 of 29 months). The half-life was chosen on the validation block.
 - **Rolling conformal calibration** brings the 80% ranges to **80.0% coverage** (77% before) and keeps 79–82% in calm, middle and wild hours; they are still 23% narrower than a fixed range.
-- **Binance order flow and ETH do not help**: neither for the returns (MAE skill ≈ 0) nor for the move size (R² 0.121–0.126 vs 0.123).
+- **Binance order flow and ETH do not help**: neither for the move size (R² 0.121–0.126 vs 0.123) nor for the next-hour direction (AUC 0.537 with and without them).
 - **Next-hour direction** has a small, stable signal, mostly the reversal of the last hour: AUC 0.537, 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
-- SVR and the ensemble do not beat the zero forecast for the returns (best MAE skill +0.00001).
 - **Trading simulation (10,000 USD, Binance fees):** buy and hold ends at 13,911 USD. The next-hour direction model makes money only without fees (up to 18,992 USD); with 0.10% fees every variant loses (8,275 USD at best), because its edge per trade (0.005–0.02%) is smaller than the fee. Volatility targeting ends at 10,586–11,065 USD.
 
 ---
