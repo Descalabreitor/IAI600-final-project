@@ -1,0 +1,7 @@
+pandas
+numpy
+scipy
+matplotlib
+yfinance
+mplfinance
+kagglehub   # only needed if btcusd_1-min_data.csv is not in the working directory
