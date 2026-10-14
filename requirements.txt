@@ -5,6 +5,7 @@ scipy==1.18.1
 scikit-learn==1.9.1
 matplotlib==3.11.2
 joblib==1.6.0
+tensorflow==2.21.0     # only course-methods.ipynb (Keras MLP)
 # to run the notebooks
 ipykernel==7.4.0
 nbconvert==7.17.1
