@@ -287,11 +287,14 @@ Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always u
 
 | File | Content |
 |---|---|
+| `course-methods.ipynb` | The project question answered only with the methods of the course labs (I–VI): preprocessing pipeline, regression for the next day's move size, classification for its direction, SVM, K-Means market regimes, Keras MLP (≈1 min to run). |
 | `v3-extensions.ipynb` | On top of version 3: Binance attributes for the move size, monthly refitting with recency weights, conformal calibration of the 80% ranges, next-hour direction (≈2 h to run). |
 | `trading-simulation.ipynb` | 10,000 USD traded on the forecasts over the test block (next-hour direction, volatility targeting) with real fees, vs. buy and hold. |
 | `download_binance.py` | Downloads Binance 1-minute klines (BTCUSDT, ETHUSDT) from data.binance.vision, checks SHA-256, aggregates to `data/binance_*_1h.csv.gz`. |
 | `binance_features.py` | Loading of the Binance hourly data and the order-flow / ETH / ETH-vs-BTC attributes. |
 | `shared_cells.py` | Runs the setup cells of Alberto's version 3 notebook inside another notebook (no copied code). |
+
+**Course methods (daily forecasts, test 2024 → Oct 2026):** the next day's move size is predictable (Linear Regression R² 0.48, SVR 0.46, Random Forest 0.41, MLP 0.37); its direction is not (all classifiers 49–51% accuracy, ROC-AUC ≈ 0.50). K-Means finds crash, rally, quiet and normal days; after crash days the next day's moves are about twice as big as after quiet days, but the direction is the same coin flip.
 
 **Main results (version-3 blocks, test Jul 2024 → Oct 2026):**
 - **Refitting every month** with sample weights halving every 12 months raises the hourly move-size R² from **0.124 to 0.148** (95% CI of the gain +0.018 to +0.029, better in 28 of 29 months). The half-life was chosen on the validation block.
