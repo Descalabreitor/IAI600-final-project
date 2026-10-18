@@ -283,15 +283,13 @@ Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always u
 
 ## 🧪 Aditional model work
 
-### Filip: extensions of version 3 and trading simulation
+### Filip: course methods and extensions of version 3
 
 | File | Content |
 |---|---|
 | `course-methods.ipynb` | The project question answered only with the methods of the course labs (I–VI): preprocessing pipeline, regression for the next day's move size, classification for its direction, SVM, K-Means market regimes, Keras MLP (≈1 min to run). |
 | `v3-extensions.ipynb` | On top of version 3: Binance attributes for the move size, monthly refitting with recency weights, conformal calibration of the 80% ranges, next-hour direction (≈2 h to run). |
-| `trading-simulation.ipynb` | 10,000 USD traded on the forecasts over the test block (next-hour direction, volatility targeting) with real fees, vs. buy and hold. |
-| `download_binance.py` | Downloads Binance 1-minute klines (BTCUSDT, ETHUSDT) from data.binance.vision, checks SHA-256, aggregates to `data/binance_*_1h.csv.gz`. |
-| `binance_features.py` | Loading of the Binance hourly data and the order-flow / ETH / ETH-vs-BTC attributes. |
+| `binance_features.py` | Downloads Binance BTCUSDT / ETHUSDT 1-minute data from data.binance.vision (SHA-256 checked) into `data/binance_*_1h.csv.gz` (`python binance_features.py`), loads it and builds the order-flow / ETH / ETH-vs-BTC attributes. |
 | `shared_cells.py` | Runs the setup cells of Alberto's version 3 notebook inside another notebook (no copied code). |
 
 **Course methods (daily forecasts, test 2024 → Oct 2026):** the next day's move size is predictable (Linear Regression R² 0.48, SVR 0.46, Random Forest 0.41, MLP 0.37); its direction is not (all classifiers 49–51% accuracy, ROC-AUC ≈ 0.50). K-Means finds crash, rally, quiet and normal days; after crash days the next day's moves are about twice as big as after quiet days, but the direction is the same coin flip.
@@ -301,7 +299,6 @@ Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always u
 - **Rolling conformal calibration** brings the 80% ranges to **80.0% coverage** (77% before) and keeps 79–82% in calm, middle and wild hours; they are still 23% narrower than a fixed range.
 - **Binance order flow and ETH do not help**: neither for the move size (R² 0.121–0.126 vs 0.123) nor for the next-hour direction (AUC 0.537 with and without them).
 - **Next-hour direction** has a small, stable signal, mostly the reversal of the last hour: AUC 0.537, 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
-- **Trading simulation (10,000 USD, Binance fees):** buy and hold ends at 13,911 USD. The next-hour direction model makes money only without fees (up to 18,992 USD); with 0.10% fees every variant loses (8,275 USD at best), because its edge per trade (0.005–0.02%) is smaller than the fee. Volatility targeting ends at 10,586–11,065 USD.
 
 ---
 
