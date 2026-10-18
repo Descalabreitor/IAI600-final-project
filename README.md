@@ -8,6 +8,7 @@
 
 ## 📑 Contents
 
+0. [Project status: what has been tried and what is left](#-project-status-what-has-been-tried-and-what-is-left)
 1. [Main ideas](#-main-ideas)
 2. [Repository structure](#-repository-structure)
 3. [Data processing and analysis](#-data-processing-and-analysis) *(to be completed)*
@@ -18,6 +19,89 @@
 8. [Use of LLMs / AI tools](#-use-of-llms--ai-tools) *(to be completed)*
 9. [How to run](#-how-to-run)
 10. [Team and contributions](#-team-and-contributions)
+
+---
+
+## 🧭 Project status: what has been tried and what is left
+
+*Written on 18 Oct 2026 after reviewing every notebook on every branch. Its purpose is to get the whole team on the same page. Authors are taken from the git history.*
+
+### Summary of each piece of work
+
+**Data preparation** (`data-preparation.ipynb`, Adrián P., branch `descalabreitor`).
+This notebook downloads the 1-minute Kaggle data, aggregates it to hourly candles, computes the hourly return, builds windows (168 input hours → 24 target hours), splits them chronologically, fits a `StandardScaler` on train only and saves everything to `data/btc_hourly_windows.npz`. The latest commit (13 Oct) changed the dataset: it now **starts in 2017 and uses an 80/20 split (test from 26 Oct 2024)**. Before, it started in 2012 with the test from Oct 2023. Every model notebook except `model_test.ipynb` was run on the old version, so their numbers are not reproducible with the file now in the repo. The global scaler does not remove the price trend: scaled test prices have a mean of 3.3 and reach 7.6, far outside the training range.
+
+**Data quality check** (done 18 Oct, not yet in a notebook).
+Since 2017 the series is complete: no missing minutes in the raw CSV and no missing hours after aggregation. Only 0.2% of hours have exactly 0% change. There are 13 hours with moves above 10%, and all of them are real events (COVID crash of 12–13 Mar 2020, crash of 19 May 2021, the ETF rejection of Mar 2017, Musk's tweet of 29 Jan 2021), not data errors. Hourly returns have very fat tails (excess kurtosis 35.7). **The data is clean. The noise is the market itself, not a data-quality problem**, so it cannot be "cleaned away". It can only be handled with robust losses, volatility scaling and aggregated targets.
+
+**Models, early draft** (`models-and-hyperparameters-ver1.ipynb`, Alberto).
+This was the first model notebook: scale-free features, one validation split, data from 2012. Every model (Ridge, Lasso, KNN, Random Forest, Gradient Boosting, MLP) ended up equal to or slightly worse than predicting 0% change. Its conclusions were never filled in, and it is **superseded by version 1**.
+
+**Models, version 1** (`bitcoin-models-new-data.ipynb`, Alberto).
+This version introduced 42 scale-free features, walk-forward cross-validation with a purge gap, and a binomial test on independent days. On the 24 hourly returns no model beats the zero forecast (MAE skill between −0.0003 and −0.0010). The 53.4% daily direction accuracy is an illusion: 53.5% of test days were up days, so the models just say "always up" (balanced accuracy 0.50). Every model gets worse on validation the more freedom it is given, which is the signature of a target that is mostly noise. With aggregated targets some signal appears: the next-day total return has an IC of 0.094, and **next-day volatility is clearly predictable** (Gradient Boosting R² 0.45, against 0.09 for the best simple rule). The current *Results* and *Conclusions* sections of this README come from this notebook.
+
+**Deep models, RNN and LSTM** (`model_test.ipynb`, Adrián P.).
+Stacked RNNs and LSTMs in PyTorch read the 168-hour sequence directly, with both scaled and unscaled inputs. All four variants end up equal to the zero forecast (MSE ratio 1.000–1.002) with ~50% direction accuracy. The training loss barely moves from the first epoch. Two things may be holding them back: the inputs are global-scaled prices that lie outside the training range in the test period, and the MSE loss is dominated by the few extreme hours. This is the only notebook already run on the current dataset. Note: the results table has a "GB" row that no cell of the notebook produces (it comes from an old kernel state).
+
+**Models, version 2** (`bitcoin-models-2018-2026.ipynb`, Alberto, **branch `alb`, not merged**).
+This version repeats version 1 with data from 2018 only and three fixed blocks: train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026. The conclusions do not change. The return models still sit at the zero forecast, and the "always up" illusion disappears because the new test period is balanced (50.4% up days). The best direction model (Logistic Regression, AUC 0.544, 52.5% accuracy) is not significant (p = 0.08). Next-day volatility remains predictable (Gradient Boosting R² 0.47). Removing the early years makes no difference for returns but clearly helps for volatility (R² 0.29 when training from 2012, against 0.41 from 2017/2018).
+
+**Models, version 3** (`bitcoin-models-v3.ipynb` + `btc_utils.py`, Alberto, **branch `alb`, not merged**, takes ~45 min to run).
+This is the most complete analysis in the project. It first explains *why* returns are unpredictable: Ljung–Box tests and autocorrelations show only a tiny reversal at lags 1, 2 and 24 hours (≤0.4% of the variance), while the *size* of the moves is strongly autocorrelated (0.27 at lag 1) and follows the clock (1.5× between the busiest and the quietest hour). It then tests 14 improvements one by one and all together: one model for all 24 hours ("long format"), the size |r| of each hour as a new target, quantile ranges, metric-matched model selection with Diebold–Mariano tests, HAR and range-based volatility features, volatility-scaled targets with Huber loss, ensembles and an economic backtest. Results:
+- Predicting the size of each of the next 24 hours reaches **R² 0.12 against 0.05 for a simple rule**, and the difference is significant.
+- The 80% hourly ranges are 36% narrower than fixed ranges.
+- Return direction stays unpredictable (IC 0.01–0.02, DM p ≥ 0.13).
+- Volatility targeting with the forecast still loses to buy & hold.
+- The extra 30-day and range-based features add nothing.
+
+**Correlation with macro variables** (`Correlation Analyses/`, Adri "no chacho").
+This analysis computes Spearman correlations between BTC returns and about 40 macro and market variables (FRED and Yahoo Finance) at daily, weekly and monthly frequency. It drops redundant variables, corrects for multiple testing (FDR), and adds lead-lag, rolling and per-year analyses. The strongest relationships are with credit and financial conditions:
+- High-yield spread −0.26 daily, but only 31% data coverage.
+- NFCI −0.19 weekly and −0.32 monthly.
+- Broad dollar −0.15 daily.
+- Net liquidity +0.29 monthly.
+
+Almost nothing relates to the *size* of BTC moves. **All 16 Yahoo Finance series failed to download** (S&P 500, Nasdaq, VIX, DXY, gold, oil…), so 4 of the 7 shortlisted variables are missing from the lead-lag and stability analyses. These results measure co-movement, not prediction, and they are not yet connected to any model.
+
+### Overall picture
+
+All the work points to the same story. **Hourly Bitcoin returns are close to a random walk**: no model (linear, trees, KNN, MLP, RNN, LSTM) beats predicting 0% change, and more flexible models only overfit. **The size of the moves (volatility) is predictable**, both per hour and for the next day, and there tree models clearly beat simple rules. The numbers of versions 1, 2 and 3 are not directly comparable because each uses a different test period.
+
+### To-do list
+
+**Coordination and repository (do first)**
+
+| # | Task | Owner |
+|---|---|---|
+| 1 | **Agree on one frozen dataset and one train/validation/test split for everybody.** Proposal: the version 2/3 blocks (train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026), since version 3 is the most advanced work. From then on, any change to `data/` is announced and goes through a pull request. | *…* |
+| 2 | Merge branch `alb` (versions 2 and 3, `btc_utils.py`, `requirements.txt`) into `main`. Expect a conflict in `README.md`, because `alb` edited the old version of it. Also merge `requirements.txt` with the PyTorch dependency of `model_test.ipynb`. | *…* |
+| 3 | Rerun every notebook on the agreed dataset, so that all numbers in the report come from the same data. | *…* |
+| 4 | Clean the repo: archive or delete `models-and-hyperparameters-ver1.ipynb`, remove the committed `__pycache__/` folders and the `.btc_cache/*.pkl` file, and add them to `.gitignore`. | *…* |
+
+**Data**
+
+| # | Task | Owner |
+|---|---|---|
+| 5 | Change `data-preparation.ipynb` to the agreed split, and also export the continuous hourly series (version 3 already rebuilds it from the windows). | *…* |
+| 6 | Normalize each window by itself (prices relative to the last close of the window, volume relative to the window mean) instead of the global scaler. This is needed for the RNN/LSTM inputs. | *…* |
+| 7 | Move the data-quality check (gaps, zero-volume hours, extreme moves) into `data-preparation.ipynb` so it appears in the report. | *…* |
+| 8 | Fix the Yahoo Finance downloads in `Correlation Analyses/` (16 series failed), then rerun the lead-lag and stability analyses with the full shortlist. Add a caveat on the 31% coverage of the high-yield spread. | *…* |
+
+**Models and analysis**
+
+| # | Task | Owner |
+|---|---|---|
+| 9 | Rerun RNN/LSTM with the normalized windows (task 6), a robust loss (Huber or MAE), and the volatility / hourly-size targets, where version 3 found real signal. Compare with version 3's tree models on the same test block. | *…* |
+| 10 | Link the macro work to the models. Use Granger causality to check whether any macro variable leads BTC, and if so test it as a feature for the next-day volatility model. | *…* |
+| 11 | Optional: add a GARCH(1,1) benchmark for volatility (version 3 has HAR features but no GARCH), and calibrated ranges with conformal prediction (version 3, idea 1). | *…* |
+
+**Report and README**
+
+| # | Task | Owner |
+|---|---|---|
+| 12 | Update *Main ideas* (the split dates there are out of date) and replace the version 1 tables in *Results* with the final, rerun numbers. | *…* |
+| 13 | Write the empty sections: *Data processing and analysis*, *Additional model work* (versions 2–3, RNN/LSTM, correlation analysis) and *LLMs* (each member notes how they used AI tools). | *…* |
+| 14 | Merge the correlation brief (`BTC_macro_correlation_results_brief.docx`) and `report_notes.md` into the README/report. | *…* |
 
 ---
 
