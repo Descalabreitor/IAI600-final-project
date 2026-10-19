@@ -1,8 +1,8 @@
 """Binance BTCUSDT / ETHUSDT data: download, hourly candles and the attributes built from them.
 
-Download (run once; the hourly files are already in the repo):
-    python binance_features.py                 # both symbols
-    python binance_features.py BTCUSDT         # one symbol
+Download (run once from the repo root; the hourly files are already in the repo):
+    python -m utils.binance                    # both symbols
+    python -m utils.binance BTCUSDT            # one symbol
 Source: https://data.binance.vision (public, no API key). Monthly zip files for finished months,
 daily zip files for the current month, each checked against its published SHA-256. Raw 1-minute
 files go to data/raw/binance/<SYMBOL>/ (not in git), hourly candles (UTC, start of the hour) to

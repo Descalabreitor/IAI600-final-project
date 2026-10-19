@@ -1,17 +1,20 @@
 """Run the setup cells of Alberto's version 3 notebook (data, features, splits, helpers) in another notebook.
 
 Usage in a notebook:
-    from shared_cells import run_shared_cells
+    from utils.notebooks import run_shared_cells
     run_shared_cells(globals(), "v3")      # hourly series, train/val/test blocks, long format
 """
 import json
+from pathlib import Path
 
 import pandas as pd
 from IPython.utils.capture import capture_output
 
+NOTEBOOKS = Path(__file__).resolve().parents[1] / "old_notebooks"
+
 # Each cell is found by a piece of code it contains
 SOURCES = {
-    "v3": ("bitcoin-models-v3.ipynb", [
+    "v3": (NOTEBOOKS / "bitcoin-models-v3.ipynb", [
         "U.load_hourly()",          # imports + continuous hourly series
         "pos_all = ",               # position of every origin in the series (+ data checks)
         "F_base = U.base_features", # FEAT with the BASE, B1, B2 feature groups
@@ -23,7 +26,7 @@ SOURCES = {
 
 
 def _cells(notebook):
-    with open(notebook) as f:
+    with open(notebook, encoding="utf-8") as f:
         return ["".join(c["source"]) for c in json.load(f)["cells"] if c["cell_type"] == "code"]
 
 

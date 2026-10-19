@@ -1,120 +1,21 @@
 # ₿ Bitcoin Prediction Model
 
-> Predicting Bitcoin's hourly price changes for the next day from the previous week, using basic machine-learning models.
+> Predicting Bitcoin's hourly price changes for the next day from the previous weeks, with classical machine-learning models and neural networks.
 
-**Course project** · Dataset: [Bitcoin Historical Data (Kaggle)](https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data/data), 1-minute data aggregated to hourly
+**Course project** · Dataset: [Bitcoin Historical Data (Kaggle)](https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data/data), 1-minute Bitstamp data aggregated to hourly
 
 ---
 
 ## 📑 Contents
 
-0. [Project status: what has been tried and what is left](#-project-status-what-has-been-tried-and-what-is-left)
 1. [Main ideas](#-main-ideas)
-2. [Repository structure](#-repository-structure)
-3. [Data processing and analysis](#-data-processing-and-analysis) *(to be completed)*
-4. [Models and hyperparameters](#-models-and-hyperparameters)
-5. [Results](#-results)
-6. [Conclusions](#-conclusions)
-7. [Extra model work](#-extra-model-work) *(to be completed)*
-8. [Use of LLMs / AI tools](#-use-of-llms--ai-tools) *(to be completed)*
-9. [How to run](#-how-to-run)
-10. [Team and contributions](#-team-and-contributions)
-
----
-
-## 🧭 Project status: what has been tried and what is left
-
-*Written on 18 Oct 2026 and updated on 19 Oct 2026 with the new work on branch `filip`, after reviewing every notebook on every branch. Its purpose is to get the whole team on the same page. Authors are taken from the git history.*
-
-### Summary of each piece of work
-
-**Data preparation** (`data-preparation.ipynb`, Adrián P., branch `descalabreitor`).
-This notebook downloads the 1-minute Kaggle data, aggregates it to hourly candles, computes the hourly return, builds windows (168 input hours → 24 target hours), splits them chronologically, fits a `StandardScaler` on train only and saves everything to `data/btc_hourly_windows.npz`. The latest commit (13 Oct) changed the dataset: it now **starts in 2017 and uses an 80/20 split (test from 26 Oct 2024)**. Before, it started in 2012 with the test from Oct 2023. Every model notebook except `model_test.ipynb` was run on the old version, so their numbers are not reproducible with the file now in the repo. The global scaler does not remove the price trend: scaled test prices have a mean of 3.3 and reach 7.6, far outside the training range.
-
-**Data quality check** (done 18 Oct, not yet in a notebook).
-Since 2017 the series is complete: no missing minutes in the raw CSV and no missing hours after aggregation. Only 0.2% of hours have exactly 0% change. There are 13 hours with moves above 10%, and all of them are real events (COVID crash of 12–13 Mar 2020, crash of 19 May 2021, the ETF rejection of Mar 2017, Musk's tweet of 29 Jan 2021), not data errors. Hourly returns have very fat tails (excess kurtosis 35.7). **The data is clean. The noise is the market itself, not a data-quality problem**, so it cannot be "cleaned away". It can only be handled with robust losses, volatility scaling and aggregated targets.
-
-**Models, early draft** (`models-and-hyperparameters-ver1.ipynb`, Alberto).
-This was the first model notebook: scale-free features, one validation split, data from 2012. Every model (Ridge, Lasso, KNN, Random Forest, Gradient Boosting, MLP) ended up equal to or slightly worse than predicting 0% change. Its conclusions were never filled in, and it is **superseded by version 1**.
-
-**Models, version 1** (`bitcoin-models-new-data.ipynb`, Alberto).
-This version introduced 42 scale-free features, walk-forward cross-validation with a purge gap, and a binomial test on independent days. On the 24 hourly returns no model beats the zero forecast (MAE skill between −0.0003 and −0.0010). The 53.4% daily direction accuracy is an illusion: 53.5% of test days were up days, so the models just say "always up" (balanced accuracy 0.50). Every model gets worse on validation the more freedom it is given, which is the signature of a target that is mostly noise. With aggregated targets some signal appears: the next-day total return has an IC of 0.094, and **next-day volatility is clearly predictable** (Gradient Boosting R² 0.45, against 0.09 for the best simple rule). The current *Results* and *Conclusions* sections of this README come from this notebook.
-
-**Deep models, RNN and LSTM** (`model_test.ipynb`, Adrián P.).
-Stacked RNNs and LSTMs in PyTorch read the 168-hour sequence directly, with both scaled and unscaled inputs. All four variants end up equal to the zero forecast (MSE ratio 1.000–1.002) with ~50% direction accuracy. The training loss barely moves from the first epoch. Two things may be holding them back: the inputs are global-scaled prices that lie outside the training range in the test period, and the MSE loss is dominated by the few extreme hours. This is the only notebook already run on the current dataset. Note: the results table has a "GB" row that no cell of the notebook produces (it comes from an old kernel state).
-
-**Models, version 2** (`bitcoin-models-2018-2026.ipynb`, Alberto, **branch `alb`, not merged**).
-This version repeats version 1 with data from 2018 only and three fixed blocks: train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026. The conclusions do not change. The return models still sit at the zero forecast, and the "always up" illusion disappears because the new test period is balanced (50.4% up days). The best direction model (Logistic Regression, AUC 0.544, 52.5% accuracy) is not significant (p = 0.08). Next-day volatility remains predictable (Gradient Boosting R² 0.47). Removing the early years makes no difference for returns but clearly helps for volatility (R² 0.29 when training from 2012, against 0.41 from 2017/2018).
-
-**Models, version 3** (`bitcoin-models-v3.ipynb` + `btc_utils.py`, Alberto, **branch `alb`, not merged**, takes ~45 min to run).
-This is the most complete analysis in the project. It first explains *why* returns are unpredictable: Ljung–Box tests and autocorrelations show only a tiny reversal at lags 1, 2 and 24 hours (≤0.4% of the variance), while the *size* of the moves is strongly autocorrelated (0.27 at lag 1) and follows the clock (1.5× between the busiest and the quietest hour). It then tests 14 improvements one by one and all together: one model for all 24 hours ("long format"), the size |r| of each hour as a new target, quantile ranges, metric-matched model selection with Diebold–Mariano tests, HAR and range-based volatility features, volatility-scaled targets with Huber loss, ensembles and an economic backtest. Results:
-- Predicting the size of each of the next 24 hours reaches **R² 0.12 against 0.05 for a simple rule**, and the difference is significant.
-- The 80% hourly ranges are 36% narrower than fixed ranges.
-- Return direction stays unpredictable (IC 0.01–0.02, DM p ≥ 0.13).
-- Volatility targeting with the forecast still loses to buy & hold.
-- The extra 30-day and range-based features add nothing.
-
-**Course methods** (`course-methods.ipynb`, Filip, **branch `filip`, not merged**, takes ~1 min to run).
-This notebook answers the project question using only the methods of the course labs (I–VI): a preprocessing pipeline with `ColumnTransformer`, regression, classification, SVMs, K-Means and a Keras MLP. It makes one forecast per day (at 23:00, for the next 24 hours) and uses its own split: train 2018–2023, test Jan 2024–Oct 2026. The next day's average move size is predictable: Linear Regression reaches R² 0.48, SVR 0.46, Random Forest 0.41 and the MLP 0.37, against ≈0 for the "same as today" rule. The simplest model wins because the relationship is almost linear: today's volatility explains tomorrow's. The direction is not predictable: every classifier (SGD, KNN, Random Forest, SVC) stays at 49–51% accuracy with ROC AUC ≈ 0.50. K-Means finds four market regimes (crash, rally, quiet and normal days). After crash days the next day's moves are about twice as big as after quiet days, but the direction is still a coin flip. This is the part of the project that maps most directly to the course syllabus.
-
-**Extensions of version 3** (`v3-extensions.ipynb` + `binance_features.py` + `shared_cells.py`, Filip, **branch `filip`, not merged**, takes ~2 h to run).
-This notebook builds directly on Alberto's version 3: `shared_cells.py` runs his setup cells instead of copying them, so the data, features and blocks are the same. It answers four questions. Results:
-- **Refitting every month**, with more weight on recent data (12-month half-life, chosen on the validation block), raises the R² of the hourly move size from 0.124 to **0.148**. The gain is significant (95% CI +0.018 to +0.029) and appears in 28 of the 29 test months. It is the largest single improvement in the project.
-- **Rolling conformal calibration** gives the 80% ranges a real coverage of **80.0%** (77% before), stable at 79–82% in calm, middle and wild hours, while staying 23% narrower than a fixed range.
-- **Binance order flow and ETH attributes add nothing** (R² 0.121–0.126, against 0.123 without them).
-- **The next hour's direction has a small but stable signal**, mostly the reversal of the last hour: AUC 0.537, and 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
-
-The main lesson is that Bitcoin's behaviour drifts (for example, a new volatility peak at 14 UTC since the ETFs), so keeping models up to date matters more than adding data sources. The branch also stops tracking `__pycache__/` and cache files, completes `requirements.txt` (adding TensorFlow) and adds the Binance data (`data/binance_*_1h.csv.gz`). Several exploratory notebooks (a trading simulation with fees, SVR/ensembles, Binance features, hourly move size) were created and later deleted. They remain in the git history, and `v3-extensions.ipynb` still mentions two of them. `filip` was built on 10 Oct by merging all the other branches, so it carries older versions of `model_test.ipynb`, the correlation notebook and the dataset, and all its results come from the old `.npz`.
-
-**Correlation with macro variables** (`Correlation Analyses/`, Adri "no chacho").
-This analysis computes Spearman correlations between BTC returns and about 40 macro and market variables (FRED and Yahoo Finance) at daily, weekly and monthly frequency. It drops redundant variables, corrects for multiple testing (FDR), and adds lead-lag, rolling and per-year analyses. The strongest relationships are with credit and financial conditions:
-- High-yield spread −0.26 daily, but only 31% data coverage.
-- NFCI −0.19 weekly and −0.32 monthly.
-- Broad dollar −0.15 daily.
-- Net liquidity +0.29 monthly.
-
-Almost nothing relates to the *size* of BTC moves. **All 16 Yahoo Finance series failed to download** (S&P 500, Nasdaq, VIX, DXY, gold, oil…), so 4 of the 7 shortlisted variables are missing from the lead-lag and stability analyses. These results measure co-movement, not prediction, and they are not yet connected to any model.
-
-### Overall picture
-
-All the work points to the same story. **Hourly Bitcoin returns are close to a random walk**: no model (linear, trees, KNN, SVM, MLP, RNN, LSTM) beats predicting 0% change, and more flexible models only overfit. The only direction signal is a small reversal for the next hour. **The size of the moves (volatility) is predictable**, both per hour and for the next day, and there the models clearly beat simple rules. Refitting the models every month improves these forecasts more than any extra feature or data source. The numbers of the different notebooks are not directly comparable, because they use different datasets and test periods.
-
-### To-do list
-
-**Coordination and repository (do first)**
-
-| # | Task | Owner |
-|---|---|---|
-| 1 | **Agree on one frozen dataset and one train/validation/test split for everybody.** Proposal: the version 2/3 blocks (train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026), since version 3 and its extensions are the most advanced work. `course-methods.ipynb` currently uses yet another split (train 2018–2023, test 2024+). From then on, any change to `data/` is announced and goes through a pull request. | *…* |
-| 2 | Merge branch `alb` (versions 2 and 3, `btc_utils.py`, `requirements.txt`) into `main`. Expect a conflict in `README.md`, because `alb` edited the old version of it. Merging `filip` (task 3) already includes `alb`. | *…* |
-| 3 | **Merge branch `filip` into `main`.** It already contains `alb`, `main`, `Adri_no_chacho` and an older `descalabreitor`, so several of its files are outdated. Expected conflicts in 4 files: in `model_test.ipynb`, `Correlation Analyses/correlation_analyses.ipynb` and `Correlation Analyses/macro_panel.py` keep the newer versions from `descalabreitor`/`main`; in `.gitignore` combine both versions. After the merge: remove the duplicated *Models and hyperparameter tuning* section at the end of `filip`'s README, move Filip's README subsection into this status section, and add PyTorch, `mplfinance` and `yfinance` to `requirements.txt`. | *…* |
-| 4 | **Rerun every notebook after the merges, on the agreed dataset**, so that all numbers in the report come from the same data. Except for `model_test.ipynb`, all the model notebooks on `alb` and `filip` were run on the old `.npz` (data from 2012). Plan for the run times: version 3 takes ~45 min and `v3-extensions.ipynb` ~2 h. | *…* |
-| 5 | Clean the repo: archive or delete `models-and-hyperparameters-ver1.ipynb`. Removing the committed `__pycache__/` folders and cache files is already done in `filip` and arrives with task 3. | *…* |
-
-**Data**
-
-| # | Task | Owner |
-|---|---|---|
-| 6 | Change `data-preparation.ipynb` to the agreed split, and also export the continuous hourly series (version 3 already rebuilds it from the windows). | *…* |
-| 7 | Normalize each window by itself (prices relative to the last close of the window, volume relative to the window mean) instead of the global scaler. This is needed for the RNN/LSTM inputs. | *…* |
-| 8 | Move the data-quality check (gaps, zero-volume hours, extreme moves) into `data-preparation.ipynb` so it appears in the report. | *…* |
-| 9 | Fix the Yahoo Finance downloads in `Correlation Analyses/` (16 series failed), then rerun the lead-lag and stability analyses with the full shortlist. Add a caveat on the 31% coverage of the high-yield spread. | *…* |
-
-**Models and analysis**
-
-| # | Task | Owner |
-|---|---|---|
-| 10 | Rerun RNN/LSTM with the normalized windows (task 7), a robust loss (Huber or MAE), and the volatility / hourly-size targets, where versions 3 and `v3-extensions` found real signal. Compare with their tree models on the same test block, ideally with monthly refits too. | *…* |
-| 11 | Link the macro work to the models. Use Granger causality to check whether any macro variable leads BTC, and if so test it as a feature for the next-day volatility model. | *…* |
-| 12 | Optional: add a GARCH(1,1) benchmark for volatility. No notebook has one yet (version 3 uses HAR features; the conformal ranges are already done in `v3-extensions.ipynb`). | *…* |
-
-**Report and README**
-
-| # | Task | Owner |
-|---|---|---|
-| 13 | Update *Main ideas* (the split dates there are out of date) and replace the version 1 tables in *Results* with the final, rerun numbers. | *…* |
-| 14 | Write the empty sections: *Data processing and analysis*, *Additional model work* (versions 2–3, course methods, `v3-extensions`, RNN/LSTM, correlation analysis) and *LLMs* (each member notes how they used AI tools). | *…* |
-| 15 | Merge the correlation brief (`BTC_macro_correlation_results_brief.docx`) and `report_notes.md` into the README/report. | *…* |
+2. [Notebooks](#-notebooks)
+3. [Results](#-results)
+4. [Conclusions](#-conclusions)
+5. [Repository structure](#-repository-structure)
+6. [How to run](#-how-to-run)
+7. [Use of LLMs / AI tools](#-use-of-llms--ai-tools)
+8. [Project status](#-project-status)
 
 ---
 
@@ -122,206 +23,158 @@ All the work points to the same story. **Hourly Bitcoin returns are close to a r
 
 | | |
 |---|---|
-| **Target** | Price change of each hour relative to the previous hour: `Close[h] / Close[h-1] − 1` (range −1 → ∞; 0.004 = +0.4%) |
-| **Features (hourly)** | Open, High, Low, Close, Volume, Return. *More datasets: …* |
-| **Input** | 7 days of hourly data: a tensor of 168 hours × 6 features (7 days × 24 hours × 6) |
-| **Output** | The 24 hourly changes of the next day |
-| **Sample period** | 8 days per sample: 7 days of input + 1 day to predict |
-| **Train / test split** | Chronological. Train: Jan 2012 → Oct 2023 · Test: Oct 2023 → Oct 2026 |
+| **Assigned task** | Predict the 24 hourly price changes of the next day, `Close[h] / Close[h-1] − 1`, from the previous hours |
+| **Data** | 76,851 consecutive hours, 1 Jan 2018 → 8 Oct 2026 (pinned Kaggle version 746). Earlier years are mostly carried-forward prices with no trades |
+| **Blocks** | Chronological, by the date of the predicted hours. **Train** Jan 2018 → Dec 2022 · **Validation** Jan 2023 → Jun 2024 · **Test** Jul 2024 → Oct 2026, with a 192-hour purge before each border |
+| **Forecast origin** | Every hour with 30 days of history and 24 hours after it. Independent test days: one forecast per day at 23:00 (829 days) |
+| **Features** | Scale-free (returns, volatilities, ranges, volume ratios, calendar), so they mean the same in 2018 and in 2026 |
+| **Evaluation** | Every choice is made on train + validation; the chosen model is refitted on both and scored **once** on test. Skill is measured against simple rules, with block-bootstrap confidence intervals |
 
-Why predict *changes* instead of prices? The price moved from a few dollars to over $100,000. Relative changes are comparable across all those years, while absolute prices are not.
-
----
-
-## 📁 Repository structure
-
-| File | Content | Owner |
-|---|---|---|
-| `data-preparation.ipynb` | Download, cleaning, hourly aggregation, windows, scaling | *…* |
-| `btc_hourly_windows.npz` | Prepared windows: `X_train`, `X_test`, `y_train`, `y_test`, dates | *…* |
-| `scaler.joblib` | `StandardScaler` fitted on the training windows | *…* |
-| `bitcoin-models-new-data.ipynb` | Models, hyperparameter tuning, evaluation, alternative targets (**already executed: all results and charts are inside**) | *…* |
-| *…* | *…* | *…* |
+Why predict *changes* instead of prices? The price went from about $3,000 to over $120,000 during the data: 72% of the test hours trade above the highest training price. Relative changes are comparable across all those years, absolute prices are not.
 
 ---
 
-## 🧹 Data processing and analysis
+## 📓 Notebooks
 
+Run them in this order, from the repo root. Each one reads the output of `hourly-base-data.ipynb` and nothing else from `data/`, except the Binance files.
 
----
-
-## 🤖 Models and hyperparameters
-
-### Step 1: From windows to model inputs
-
-The standardized prices still contain the long-term trend: test-period prices are mostly **above** anything seen in training. Tree models cannot predict outside their training range, and linear models extrapolate it badly.
-
-So each 7-day window is turned into **42 scale-free features**. These mean the same thing in 2017 and in 2026.
-
-| Group | Features |
-|---|---|
-| Recent returns | the last 24 hourly returns |
-| Trend and volatility | mean and standard deviation of returns over 24 h, 72 h and 168 h |
-| Price position | 24 h return, 7-day return, position in the week's high–low range, distance to the week's average |
-| Intra-hour range | average (High − Low) / Close over 24 h and 168 h |
-| Volume | last 24 h and last hour compared with the week |
-| Calendar | hour of day and day of week (sine/cosine) |
-
-Other choices, each checked against the data:
-
-- **Training starts in 2017.** In 2012 about half the hours had 0% change (almost no trading), and early volatility was 2–3× higher. An experiment confirmed that adding the early years does not help.
-- **Every 6th window is kept for training.** Consecutive windows share 167 of their 168 hours, so this is ~6× faster and loses almost nothing.
-- **The first 24 test windows are dropped**, because their targets overlap the last training targets.
-
-### Step 2: Validation method
-
-```
-2017 ───────────────────────────────────── Oct 2023 │ Oct 2023 ───────── Oct 2026
-Fold 1: [ train ][ val ]                            │
-Fold 2: [   train   ][ val ]                        │       TEST
-Fold 3: [     train     ][ val ]                    │   (used once per
-Fold 4: [        train        ][ val ]              │    final model)
-          walk-forward cross-validation             │
-```
-
-- **Walk-forward cross-validation** (4 folds) is used to choose hyperparameters. Each fold trains on the past and validates on the following ~16 months, with a gap so overlapping windows cannot leak. Random K-fold would let the model "see the future".
-- The best setting is retrained on the full training period and evaluated **once** on the test period.
-- Direction accuracy is checked on **~1,075 non-overlapping test days** with a binomial test, to separate skill from luck.
-
-### Step 3: Metrics
-
-| Metric | Meaning | "No skill" value |
+| Notebook | Content | Run time |
 |---|---|---|
-| **MAE** | Average error per predicted hour, in % | ≈ 0.325% (predicting 0 every hour) |
-| **MAE skill** | `1 − MAE_model / MAE_zero`: share of the zero forecast's error that is removed | 0 |
-| **R²_oos** | Same idea with squared errors | 0 |
-| **IC** | Correlation between predicted and actual changes | 0 |
-| **Direction accuracy** | Share of days where up/down is predicted correctly | ≈ 50% |
-| **Balanced accuracy** | Average accuracy on up days and on down days, so "always up" cannot cheat | 0.50 |
+| `hourly-base-data.ipynb` | Builds the base data `data/btc_hourly.csv.gz` | not measured (Kaggle download) |
+| `data-analysis.ipynb` | What the data says before any model | not measured (macro downloads) |
+| `classical-models.ipynb` | Every non-neural experiment of the project | ≈ 27 min (16 cores) |
+| `neural-models.ipynb` | Every neural-network experiment, on the same rows and test days | ≈ 133 min (CPU) |
 
-### Step 4: Models tried
+**`hourly-base-data.ipynb`.** Downloads the pinned Kaggle version and aggregates the minutes into hourly candles, without `dropna()` so the hourly grid stays continuous. It finds that the dataset hides its gaps: a minute without trades is a flat, zero-volume candle at the previous close (95% of 2012, 25–40% of 2013–2016, 1–4% since 2018). That is why the series starts on 1 Jan 2018. The 15 outages of an hour or more are flagged (`filled_minutes`, `no_trade`), not removed. No split and no scaling: those are model decisions.
 
-All models are standard scikit-learn models; only their hyperparameters were tuned.
+**`data-analysis.ipynb`.** Overview of price and volume by year, the return distribution (excess kurtosis 41 hourly) and the largest moves, all real events. Autocorrelation, Ljung–Box and an AR(24) model show that returns are almost pure noise while their size is strongly autocorrelated. Calendar patterns and their drift (the 14 UTC volatility peak since the spot ETFs), volatility regimes and K-Means day clusters, Binance and ETH, and the macro correlations of `Correlation Analyses/`. Analyses that could steer a model use only the train block.
 
-| Model | Hyperparameters tuned | Best setting |
-|---|---|---|
-| Ridge regression | `alpha` (0.1 → 10⁷) | alpha = 100,000 |
-| Lasso regression | `alpha` (0.003 → 0.3) | alpha = 0.1 (removes all features) |
-| k-Nearest Neighbors | `n_neighbors`, `weights` | k = 1000, uniform |
-| Random Forest | `max_depth`, `min_samples_leaf`, `max_features` | depth 4, leaf 100, 30% of features |
-| Gradient Boosting | `learning_rate`, `max_depth` | lr 0.03, depth 2 |
-| Small MLP *(optional)* | `hidden_layer_sizes`, `alpha` | (32,), alpha = 100 |
+**`classical-models.ipynb`.** Brings together versions 1–3 of the models, `v3-extensions.ipynb` and `course-methods.ipynb`: the 24 hourly returns (wide and long format, metric-matched selection, Diebold–Mariano), the next-hour direction, the size of each hourly move (with monthly refits), 80% prediction ranges with conformal calibration, the three next-day targets (return, direction, volatility), the course-lab pipeline, an economic test and bootstrap intervals. Models: Ridge, Lasso, ElasticNet, KNN, SVR / SVC, Random Forest, Extra Trees, Gradient Boosting, ensembles.
 
-Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always up"), **persistence** (repeat today), and **last-hour reversal**.
+**`neural-models.ipynb`.** MLPs (scikit-learn and PyTorch), RNN and LSTM (PyTorch) and the Keras MLP of the course, on the same origins, blocks and test days as the classical models, so every network is compared with a classical reference. The recurrent models read a 168-hour window of 9 window-normalized channels, with MSE and Huber losses. The PyTorch networks early-stop on the validation block, never on a random hold-out; final networks are averaged over several seeds. **Its written conclusions are still pending** (see the to-do list); the results below are from its last run.
 
 ---
 
 ## 📊 Results
 
-*Test period: 25 Oct 2023 → 5 Oct 2026. Numbers will shift slightly if the data is refreshed.*
+Last run of `classical-models.ipynb` and `neural-models.ipynb`, test block Jul 2024 → Oct 2026. Every model was chosen without looking at the test block.
 
-### Main target: the 24 hourly changes
+| Question | Best model | Test result | Simple rule | Better than the rule? |
+|---|---|---|---|---|
+| **24 hourly returns** (assigned task) | none beats zero | MAE skill −0.0005 to −0.0002 (networks −0.0017 to −0.0003), IC ≤ 0.018, Diebold–Mariano p ≥ 0.16 | zero forecast | no |
+| **Direction of the next hour** | GB classifier · LSTM, every origin | AUC 0.540, 56.6% right on the 10% most confident calls · AUC 0.539, 59.5% | reversal of the last hour: AUC 0.528 | yes (p < 10⁻⁸), small and before costs |
+| **Size of each of the next 24 hours** | GB, refitted monthly · ensemble GB + MLP + LSTM | R² 0.144 (fitted once 0.117) · R² 0.127 | last week × hour profile: R² 0.053 | yes |
+| **80% range for each hour** | GB quantile + rolling conformal | coverage 79.9% (calm 78%, wild 82%), width 0.98% | fixed range: 87.6%, width 1.28% | yes |
+| **Next-day return** | Ridge | R²_oos +0.001, IC 0.041 | zero forecast | no |
+| **Next-day direction** | Random Forest | AUC 0.513, accuracy 50.3% | always up: 50.1% | no |
+| **Next-day volatility** | Gradient Boosting | R² 0.477 (95% CI 0.42–0.53); MLP 0.460 | last week's average: R² 0.094 | yes |
+| **Next-day move size** (course pipeline) | Linear Regression | R² 0.490 (SVR 0.478, RF 0.443, Keras MLP 0.396) | same as today: R² ≈ 0 | yes (not bootstrapped) |
+| **Volatility targeting** (economic test) | position from the GB volatility forecast | Sharpe 0.23, max drawdown 67% | buy & hold: Sharpe 0.50, 53% | no, worse |
 
-| Model | MAE (%) | MAE skill | IC | Daily direction | Balanced acc. |
-|---|---|---|---|---|---|
-| Baseline: zero | **0.3251** | 0.0000 | none | 46.6% | 0.500 |
-| Baseline: mean per hour | 0.3252 | −0.0004 | 0.000 | 53.4% | 0.500 |
-| Ridge | 0.3252 | −0.0003 | 0.004 | 53.4% | 0.500 |
-| Lasso | 0.3252 | −0.0004 | 0.000 | 53.4% | 0.500 |
-| k-Nearest Neighbors | 0.3254 | −0.0010 | 0.001 | 50.3% | 0.485 |
-| Random Forest | 0.3252 | −0.0003 | 0.003 | 53.4% | 0.500 |
-| Gradient Boosting | 0.3252 | −0.0004 | 0.005 | 53.5% | 0.501 |
-| MLP | 0.3254 | −0.0008 | 0.001 | 53.4% | 0.500 |
-| Baseline: persistence | 0.4830 | −0.486 | −0.011 | 48.7% | 0.485 |
+Networks against the classical reference (bootstrap, 95% CI of the difference):
 
-### Alternative targets (built from the same data)
-
-| Target | Best model | Result | No-skill reference |
-|---|---|---|---|
-| **A. Next-day total return** (one number) | Ridge | IC = **0.094**, R²_oos = +0.009 | IC = 0, R²_oos = 0 |
-| **B. Next-day up/down** (classification) | Logistic Regression | ROC AUC = **0.54** | AUC = 0.50 |
-| **C. Next-day volatility** (size of the moves) | Gradient Boosting | R² = **0.45** | R² = 0.09 (last week's average) |
-
-<details>
-<summary>Volatility results in detail</summary>
-
-| Model | MAE (log volatility) | R² | Correlation |
-|---|---|---|---|
-| Baseline: yesterday's volatility | 0.412 | −0.14 | 0.43 |
-| Baseline: last week's average | 0.360 | 0.09 | 0.45 |
-| Ridge | 0.313 | 0.34 | 0.60 |
-| Random Forest | 0.292 | 0.43 | 0.66 |
-| **Gradient Boosting** | **0.285** | **0.45** | **0.68** |
-
-</details>
+- Hourly move size: the ensemble GB + MLP + LSTM (every origin) beats GB alone by +0.010 R² (+0.007 to +0.013). The MLP alone ties GB; the LSTM is worse (−0.012).
+- Next-hour direction: LSTM − GB AUC −0.005 to +0.007, a tie.
+- Next-day volatility: MLP − GB −0.036 to −0.000; the ensemble ties GB.
+- Next-day move size: Keras MLP − Linear Regression −0.17 to −0.03.
 
 ---
 
 ## ✅ Conclusions
 
-1. **Hourly changes cannot be predicted better than "no change".** Every tuned model ends up within 0.0003 percentage points of the zero forecast. This matches the well-known behaviour of short-term prices, which are close to a random walk, so it is a correct result rather than a failure of the models.
-
-2. **Beware of direction accuracy.** The models reach 53.4% daily direction accuracy (p ≈ 0.01), but only because 53.5% of test days were up days. They effectively predict "always up", and their balanced accuracy is exactly 0.50.
-
-3. **Hyperparameters behave as theory predicts.** For every model, the more freedom it gets, the worse it does on new data.
-   - Random Forest: depth 16 with small leaves reaches train skill +0.016 but validation skill −0.004.
-   - Gradient Boosting: a higher learning rate and deeper trees overfit in the same way.
-   - KNN: k = 10 gives skill −0.086, while k = 1000 gives −0.001.
-   - Ridge, Lasso and MLP: the strongest regularization wins.
-
-   This pattern is the signature of a target that is mostly noise.
-
-4. **Old data does not help.** Training from 2012, 2014, 2017, 2019 or 2021 makes no meaningful difference, and including 2012 gave the worst correlation.
-
-5. **Aggregating helps a little.** Predicting the next day's *total* return gives a weak but measurable signal (IC ≈ 0.09).
-
-6. **Volatility is predictable.** The size of tomorrow's moves can be forecast well. Gradient Boosting explains about 45% of its variation, and here non-linear models clearly beat linear ones.
-
-> **In one sentence:** hourly Bitcoin price changes are essentially unpredictable with basic ML, but how *much* the price will move tomorrow is predictable, and there Gradient Boosting performs best.
+1. **Hourly returns are close to a random walk.** No model (linear, trees, KNN, SVM, MLP, RNN, LSTM) beats predicting 0% change, and the more freedom a model gets, the worse it does on validation. The only dependence is a tiny reversal (lags 1, 2 and 24 h, ≤ 0.4% of the variance).
+2. **The only direction signal is the next hour**, mostly the reversal of the last hour: about 55–60 right out of 100 confident calls. Hours 2–24 and the next day are a coin flip.
+3. **The size of the moves is predictable**, per hour (R² 0.12–0.14, more than twice the best rule) and per day (R² ≈ 0.48). Prediction ranges can be made both honest (80% coverage in calm and wild hours) and narrower than fixed ones.
+4. **Keeping models up to date matters more than more data.** Monthly refits with recency weights are the largest single gain; Binance order flow and ETH add nothing, and the macro variables only move together with BTC: none leads it. Bitcoin's behaviour drifts (e.g. the 14 UTC volatility peak since the ETFs).
+5. **Networks do not beat trees on these tables.** They match Gradient Boosting at best; a small gain comes only from ensembling model families trained on every origin. On the small daily table the linear model wins.
+6. **A good forecast is not a good strategy.** Volatility targeting with an R² ≈ 0.48 forecast still lost to buy & hold, because of its design (target level, leverage, costs).
 
 ---
 
-## 🧪 Aditional model work
+## 📁 Repository structure
 
-### Filip: course methods and extensions of version 3
-
-| File | Content |
+| Path | Content |
 |---|---|
-| `course-methods.ipynb` | The project question answered only with the methods of the course labs (I–VI): preprocessing pipeline, regression for the next day's move size, classification for its direction, SVM, K-Means market regimes, Keras MLP (≈1 min to run). |
-| `v3-extensions.ipynb` | On top of version 3: Binance attributes for the move size, monthly refitting with recency weights, conformal calibration of the 80% ranges, next-hour direction (≈2 h to run). |
-| `binance_features.py` | Downloads Binance BTCUSDT / ETHUSDT 1-minute data from data.binance.vision (SHA-256 checked) into `data/binance_*_1h.csv.gz` (`python binance_features.py`), loads it and builds the order-flow / ETH / ETH-vs-BTC attributes. |
-| `shared_cells.py` | Runs the setup cells of Alberto's version 3 notebook inside another notebook (no copied code). |
+| `hourly-base-data.ipynb`, `data-analysis.ipynb`, `classical-models.ipynb`, `neural-models.ipynb` | The four project notebooks (see above) |
+| `data/btc_hourly.csv.gz` | Base data: `Open, High, Low, Close, Volume, Return, filled_minutes, no_trade` |
+| `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), from `python -m utils.binance` |
+| `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old data preparation, read only by the archived notebooks |
+| `utils/` | Shared helpers imported by the notebooks |
+| `old_notebooks/` | Archived notebooks, superseded by the four above. [Their summary](old_notebooks/README.md) |
+| `Correlation Analyses/` | Macro correlation notebook (data from 2017), its README and results brief (`.docx`) |
+| `report_notes.md` | Notes for the final report |
 
-**Course methods (daily forecasts, test 2024 → Oct 2026):** the next day's move size is predictable (Linear Regression R² 0.48, SVR 0.46, Random Forest 0.41, MLP 0.37); its direction is not (all classifiers 49–51% accuracy, ROC-AUC ≈ 0.50). K-Means finds crash, rally, quiet and normal days; after crash days the next day's moves are about twice as big as after quiet days, but the direction is the same coin flip.
-
-**Main results (version-3 blocks, test Jul 2024 → Oct 2026):**
-- **Refitting every month** with sample weights halving every 12 months raises the hourly move-size R² from **0.124 to 0.148** (95% CI of the gain +0.018 to +0.029, better in 28 of 29 months). The half-life was chosen on the validation block.
-- **Rolling conformal calibration** brings the 80% ranges to **80.0% coverage** (77% before) and keeps 79–82% in calm, middle and wild hours; they are still 23% narrower than a fixed range.
-- **Binance order flow and ETH do not help**: neither for the move size (R² 0.121–0.126 vs 0.123) nor for the next-hour direction (AUC 0.537 with and without them).
-- **Next-hour direction** has a small, stable signal, mostly the reversal of the last hour: AUC 0.537, 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
-
----
-
-## 🧠 LLMs
-
-
----
+| Module | Content | Used by |
+|---|---|---|
+| `utils/hourly.py` | Features, targets, metrics, Ljung–Box, Diebold–Mariano, block bootstrap | data analysis, classical, neural |
+| `utils/binance.py` | Binance download from data.binance.vision (SHA-256 checked), order-flow / ETH / ETH-vs-BTC attributes | data analysis, classical |
+| `utils/macro.py` | FRED / Yahoo Finance downloads (cached in `.macro_cache/`), D / W / ME panels, hourly macro features without lookahead | data analysis, correlation |
+| `utils/correlation.py` | Correlation tables with FDR, pruning, lead-lag, per-year stability, plots | data analysis, correlation |
+| `utils/btc_data.py` | Daily / weekly / monthly BTC frames from the base data (`frames_from_hourly`) or the 1-minute file (`load_btc`) | data analysis, correlation |
+| `utils/notebooks.py` | Runs the setup cells of version 3 inside another notebook | archived `v3-extensions.ipynb` |
 
 ---
 
-## Models and hyperparameter tuning
+## 🚀 How to run
 
-All notebooks read the output of `data-preparation.ipynb` (`data/btc_hourly_windows.npz`, `data/scaler.joblib`) without modifying it. Install the packages with `pip install -r requirements.txt` (Python 3.12).
+1. **Environment.** Python 3.12 and `pip install -r requirements.txt`. A CUDA GPU speeds up `neural-models.ipynb`; PyTorch falls back to the CPU.
+2. **Notebooks.** Run them from the repo root, in the order of the table above. `data/btc_hourly.csv.gz` is already in the repo; rebuilding it gives the same file, because the Kaggle version is pinned.
+3. **Binance data.** Already in the repo. To extend it to the latest day: `python -m utils.binance`.
+4. **Macro data.** Downloads are cached in `.macro_cache/` and `.btc_cache/`; delete them to force a fresh download.
+5. **Archived notebooks.** See [`old_notebooks/README.md`](old_notebooks/README.md).
 
-| File | Content |
-|---|---|
-| `bitcoin-models-new-data.ipynb` | **Version 1.** Scale-free features, walk-forward CV, Ridge / Lasso / KNN / Random Forest / Gradient Boosting / MLP on the 24 hourly returns, alternative daily targets (return, direction, volatility). |
-| `bitcoin-models-2018-2026.ipynb` | **Version 2.** Only 2018–2026 data, fixed train / validation / test blocks (2018–2022 / 2023–Jun 2024 / Jul 2024–Oct 2026), test of whether the early years hurt. |
-| `bitcoin-models-v3.ipynb` | **Version 3 (final).** Why the hourly forecasts look like noise, and 14 improvements tested one by one and together (≈45 min to run). |
-| `btc_utils.py` | Shared helpers of version 3: rebuilding the continuous hourly series, features, targets, metrics, Ljung–Box, Diebold–Mariano and block-bootstrap. |
+After changing a file in `utils/`, restart the notebook kernel: Python keeps imported modules in memory.
 
-**Main results (test block Jul 2024 → Oct 2026):**
-- Hourly returns are close to a random walk: no model beats the "0%" forecast in a statistically reliable way (best IC ≈ 0.02, R²_oos ≈ 0).
-- The *size* of each of the next 24 hourly moves is predictable: one long-format Gradient Boosting / ensemble model reaches R² ≈ 0.12, 2.2× a simple volatility rule.
-- Quantile models give 80% ranges for every hour that are 36% narrower than fixed ranges and adapt to calm and wild periods.
-- Next-day volatility is predictable (R² ≈ 0.46–0.50); next-day direction is not (AUC 0.52, not significant).
+---
+
+## 🧠 Use of LLMs / AI tools
+
+*Pending: each member adds how they used AI tools.*
+
+---
+
+## 🧭 Project status
+
+*Updated 19 Oct 2026, after unifying the notebooks on branch `feature/experiments-unification`.*
+
+### To-do list
+
+| # | Task | Status | Owner |
+|---|---|---|---|
+| 1 | One frozen dataset and one train / validation / test split for everybody | ✅ Done: `hourly-base-data.ipynb` + the version 2/3 blocks, used by all four notebooks. Any change to `data/` goes through a pull request | Adrián P. |
+| 2 | Merge branches `filip` (PR #7) and `alb` (PR #8) into `main` | ✅ Done | Adrián P. |
+| 3 | Archive the earlier notebooks, unify the helper scripts in `utils/`, stop tracking caches | ✅ Done (`old_notebooks/`, `utils/`) | Adrián P. |
+| 4 | Rerun every experiment on the agreed dataset | ✅ Done in `classical-models.ipynb` and `neural-models.ipynb` | Adrián P. |
+| 5 | Check the data: hidden gaps, outages, `no_trade` hours, extreme moves | ✅ Done in `hourly-base-data.ipynb` | Adrián P. |
+| 6 | Normalize each window by itself for the recurrent models | ✅ Done (`neural-models.ipynb` §1.4) | Adrián P. |
+| 7 | Rerun RNN/LSTM with normalized windows, a robust loss and the volatility targets | ✅ Done (`neural-models.ipynb` §3, §5), except monthly refits | Adrián P. |
+| 8 | **Write the conclusions of `neural-models.ipynb`** (§3–§9 are marked *Pending*) and replace "Run time pending" in its header with ≈ 133 min | ⏳ Pending | *…* |
+| 9 | **Review the "What we see" texts** of `data-analysis.ipynb` and `classical-models.ipynb`: they are quoted from the archived runs and some numbers no longer match the outputs (e.g. K-Means cluster sizes, course-methods results). Rewrite them on this run | ⏳ Pending | *…* |
+| 10 | **Fix the Yahoo Finance downloads.** The last run of `data-analysis.ipynb` failed with `No module named 'yfinance'`: install it (it is in `requirements.txt`) and rerun §8, so S&P 500, VIX, DXY and gold are back in the lead-lag and stability analyses. HY_OAS covers only 34% of the daily panel | ⏳ Pending | *…* |
+| 11 | Link the macro work to the models: Granger causality, and macro features in the next-day volatility model | ⏳ Pending | *…* |
+| 12 | Add a GARCH(1,1) benchmark for volatility | ⏳ Pending (optional) | *…* |
+| 13 | Decide what to do with `Correlation Analyses/`: `data-analysis.ipynb` §8 now repeats it on the base data (from 2018). Archive it or keep it as the reference for the brief | ⏳ Pending | *…* |
+| 14 | Write the *Use of LLMs* section and the final report (from `report_notes.md` and this README) | ⏳ Pending | everybody |
+
+### Possible improvements
+
+**Models**
+
+- **Monthly refits for the networks and the ensembles.** The largest classical gain (hourly \|r\| R² 0.117 → 0.144) has not been tried with networks, nor with the ensemble that already beats Gradient Boosting fitted once.
+- **Monthly refit + rolling conformal for the quantile models.** `v3-extensions.ipynb` found the lowest pinball loss with the same 80% coverage; not rerun.
+- **Use the `no_trade` / `filled_minutes` flags.** No model uses them: drop or down-weight the origins whose input or target hours contain an outage.
+- **Rerun the version 3 parts left out**: volatility-scaled target with Huber loss and 1/σ² weights, permutation importance, the leave-one-out ablation, and the regime analysis of the models.
+- **Other networks**: GRU, temporal convolutions or a small Transformer, an LSTM for next-day volatility, quantile networks for the ranges.
+
+**Evaluation**
+
+- **More than one test period.** Every conclusion rests on 2.25 years; a rolling-origin evaluation over 2023–2026 would show how stable the ranking of close models is.
+- **Correct for multiple testing** (Holm or Benjamini–Hochberg) across the many direction and return tests, instead of reading single p-values.
+- **Economic test with costs for the next-hour signal**, the only direction signal found; and a volatility-targeting design tuned on validation (target level from a recent window, leverage cap, rebalancing threshold to cut turnover).
+
+**Code and reproducibility**
+
+- **Move the shared setup to `utils/`.** `neural-models.ipynb` copies §1.1–1.4 and the helpers of `classical-models.ipynb`; one module would keep both notebooks identical by construction.
+- **Update the `utils/hourly.py` docstring**: it still describes the old `.npz` windows, which the current notebooks do not use.
+- **Headless runs.** A script that runs the four notebooks with `nbconvert` and records the run times, and a quick mode (fewer seeds, smaller grids) for `neural-models.ipynb`, which takes over 2 h on CPU.
+- **Remove the old data files** (`btc_hourly_windows.npz`, `scaler.joblib`) from `data/` once nobody needs to rerun the archived notebooks.

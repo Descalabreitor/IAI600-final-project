@@ -1,5 +1,8 @@
 """
-btc_data.py - BTC OHLCV loading for the correlation analysis.
+btc_data.py - BTC daily / weekly / monthly OHLCV loading for the correlation analysis.
+
+frames_from_hourly builds the same frames from the base hourly series (data/btc_hourly.csv.gz),
+which is what data-analysis.ipynb uses. load_btc is kept for the Correlation Analyses notebook.
 
 Only the three frames the analysis uses are built (daily, weekly, monthly). The 1-minute
 file is read inside a function, so it is released as soon as the frames are built, and the
@@ -70,6 +73,21 @@ def load_btc(csv: str | Path | None = None, cache_dir: str = ".btc_cache",
     for old in cache.glob("btc_*.pkl"):      # drop caches of previous versions of the file
         old.unlink()
     pd.to_pickle(frames, p)
+    return frames
+
+
+def frames_from_hourly(hourly: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """OHLCV frames {"D", "W", "ME"} from the base hourly series (data/btc_hourly.csv.gz).
+
+    Same labels as load_btc (last calendar day of the period). The periods that are still
+    incomplete at the end of the series (last day, week and month) are dropped, so every Close
+    is the real close of its period.
+    """
+    end = hourly.index[-1] + pd.Timedelta(hours=1)          # the last hour ends here
+    frames = {}
+    for freq in ("D", "W", "ME"):
+        df = hourly[list(OHLCV)].resample(freq).agg(OHLCV).dropna()
+        frames[freq] = df[df.index + pd.Timedelta(days=1) <= end]
     return frames
 
 
