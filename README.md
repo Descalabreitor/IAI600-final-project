@@ -24,7 +24,7 @@
 
 ## 🧭 Project status: what has been tried and what is left
 
-*Written on 18 Oct 2026 after reviewing every notebook on every branch. Its purpose is to get the whole team on the same page. Authors are taken from the git history.*
+*Written on 18 Oct 2026 and updated on 19 Oct 2026 with the new work on branch `filip`, after reviewing every notebook on every branch. Its purpose is to get the whole team on the same page. Authors are taken from the git history.*
 
 ### Summary of each piece of work
 
@@ -54,6 +54,18 @@ This is the most complete analysis in the project. It first explains *why* retur
 - Volatility targeting with the forecast still loses to buy & hold.
 - The extra 30-day and range-based features add nothing.
 
+**Course methods** (`course-methods.ipynb`, Filip, **branch `filip`, not merged**, takes ~1 min to run).
+This notebook answers the project question using only the methods of the course labs (I–VI): a preprocessing pipeline with `ColumnTransformer`, regression, classification, SVMs, K-Means and a Keras MLP. It makes one forecast per day (at 23:00, for the next 24 hours) and uses its own split: train 2018–2023, test Jan 2024–Oct 2026. The next day's average move size is predictable: Linear Regression reaches R² 0.48, SVR 0.46, Random Forest 0.41 and the MLP 0.37, against ≈0 for the "same as today" rule. The simplest model wins because the relationship is almost linear: today's volatility explains tomorrow's. The direction is not predictable: every classifier (SGD, KNN, Random Forest, SVC) stays at 49–51% accuracy with ROC AUC ≈ 0.50. K-Means finds four market regimes (crash, rally, quiet and normal days). After crash days the next day's moves are about twice as big as after quiet days, but the direction is still a coin flip. This is the part of the project that maps most directly to the course syllabus.
+
+**Extensions of version 3** (`v3-extensions.ipynb` + `binance_features.py` + `shared_cells.py`, Filip, **branch `filip`, not merged**, takes ~2 h to run).
+This notebook builds directly on Alberto's version 3: `shared_cells.py` runs his setup cells instead of copying them, so the data, features and blocks are the same. It answers four questions. Results:
+- **Refitting every month**, with more weight on recent data (12-month half-life, chosen on the validation block), raises the R² of the hourly move size from 0.124 to **0.148**. The gain is significant (95% CI +0.018 to +0.029) and appears in 28 of the 29 test months. It is the largest single improvement in the project.
+- **Rolling conformal calibration** gives the 80% ranges a real coverage of **80.0%** (77% before), stable at 79–82% in calm, middle and wild hours, while staying 23% narrower than a fixed range.
+- **Binance order flow and ETH attributes add nothing** (R² 0.121–0.126, against 0.123 without them).
+- **The next hour's direction has a small but stable signal**, mostly the reversal of the last hour: AUC 0.537, and 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
+
+The main lesson is that Bitcoin's behaviour drifts (for example, a new volatility peak at 14 UTC since the ETFs), so keeping models up to date matters more than adding data sources. The branch also stops tracking `__pycache__/` and cache files, completes `requirements.txt` (adding TensorFlow) and adds the Binance data (`data/binance_*_1h.csv.gz`). Several exploratory notebooks (a trading simulation with fees, SVR/ensembles, Binance features, hourly move size) were created and later deleted. They remain in the git history, and `v3-extensions.ipynb` still mentions two of them. `filip` was built on 10 Oct by merging all the other branches, so it carries older versions of `model_test.ipynb`, the correlation notebook and the dataset, and all its results come from the old `.npz`.
+
 **Correlation with macro variables** (`Correlation Analyses/`, Adri "no chacho").
 This analysis computes Spearman correlations between BTC returns and about 40 macro and market variables (FRED and Yahoo Finance) at daily, weekly and monthly frequency. It drops redundant variables, corrects for multiple testing (FDR), and adds lead-lag, rolling and per-year analyses. The strongest relationships are with credit and financial conditions:
 - High-yield spread −0.26 daily, but only 31% data coverage.
@@ -65,7 +77,7 @@ Almost nothing relates to the *size* of BTC moves. **All 16 Yahoo Finance series
 
 ### Overall picture
 
-All the work points to the same story. **Hourly Bitcoin returns are close to a random walk**: no model (linear, trees, KNN, MLP, RNN, LSTM) beats predicting 0% change, and more flexible models only overfit. **The size of the moves (volatility) is predictable**, both per hour and for the next day, and there tree models clearly beat simple rules. The numbers of versions 1, 2 and 3 are not directly comparable because each uses a different test period.
+All the work points to the same story. **Hourly Bitcoin returns are close to a random walk**: no model (linear, trees, KNN, SVM, MLP, RNN, LSTM) beats predicting 0% change, and more flexible models only overfit. The only direction signal is a small reversal for the next hour. **The size of the moves (volatility) is predictable**, both per hour and for the next day, and there the models clearly beat simple rules. Refitting the models every month improves these forecasts more than any extra feature or data source. The numbers of the different notebooks are not directly comparable, because they use different datasets and test periods.
 
 ### To-do list
 
@@ -73,35 +85,36 @@ All the work points to the same story. **Hourly Bitcoin returns are close to a r
 
 | # | Task | Owner |
 |---|---|---|
-| 1 | **Agree on one frozen dataset and one train/validation/test split for everybody.** Proposal: the version 2/3 blocks (train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026), since version 3 is the most advanced work. From then on, any change to `data/` is announced and goes through a pull request. | *…* |
-| 2 | Merge branch `alb` (versions 2 and 3, `btc_utils.py`, `requirements.txt`) into `main`. Expect a conflict in `README.md`, because `alb` edited the old version of it. Also merge `requirements.txt` with the PyTorch dependency of `model_test.ipynb`. | *…* |
-| 3 | Rerun every notebook on the agreed dataset, so that all numbers in the report come from the same data. | *…* |
-| 4 | Clean the repo: archive or delete `models-and-hyperparameters-ver1.ipynb`, remove the committed `__pycache__/` folders and the `.btc_cache/*.pkl` file, and add them to `.gitignore`. | *…* |
+| 1 | **Agree on one frozen dataset and one train/validation/test split for everybody.** Proposal: the version 2/3 blocks (train 2018–2022, validation 2023–Jun 2024, test Jul 2024–Oct 2026), since version 3 and its extensions are the most advanced work. `course-methods.ipynb` currently uses yet another split (train 2018–2023, test 2024+). From then on, any change to `data/` is announced and goes through a pull request. | *…* |
+| 2 | Merge branch `alb` (versions 2 and 3, `btc_utils.py`, `requirements.txt`) into `main`. Expect a conflict in `README.md`, because `alb` edited the old version of it. Merging `filip` (task 3) already includes `alb`. | *…* |
+| 3 | **Merge branch `filip` into `main`.** It already contains `alb`, `main`, `Adri_no_chacho` and an older `descalabreitor`, so several of its files are outdated. Expected conflicts in 4 files: in `model_test.ipynb`, `Correlation Analyses/correlation_analyses.ipynb` and `Correlation Analyses/macro_panel.py` keep the newer versions from `descalabreitor`/`main`; in `.gitignore` combine both versions. After the merge: remove the duplicated *Models and hyperparameter tuning* section at the end of `filip`'s README, move Filip's README subsection into this status section, and add PyTorch, `mplfinance` and `yfinance` to `requirements.txt`. | *…* |
+| 4 | **Rerun every notebook after the merges, on the agreed dataset**, so that all numbers in the report come from the same data. Except for `model_test.ipynb`, all the model notebooks on `alb` and `filip` were run on the old `.npz` (data from 2012). Plan for the run times: version 3 takes ~45 min and `v3-extensions.ipynb` ~2 h. | *…* |
+| 5 | Clean the repo: archive or delete `models-and-hyperparameters-ver1.ipynb`. Removing the committed `__pycache__/` folders and cache files is already done in `filip` and arrives with task 3. | *…* |
 
 **Data**
 
 | # | Task | Owner |
 |---|---|---|
-| 5 | Change `data-preparation.ipynb` to the agreed split, and also export the continuous hourly series (version 3 already rebuilds it from the windows). | *…* |
-| 6 | Normalize each window by itself (prices relative to the last close of the window, volume relative to the window mean) instead of the global scaler. This is needed for the RNN/LSTM inputs. | *…* |
-| 7 | Move the data-quality check (gaps, zero-volume hours, extreme moves) into `data-preparation.ipynb` so it appears in the report. | *…* |
-| 8 | Fix the Yahoo Finance downloads in `Correlation Analyses/` (16 series failed), then rerun the lead-lag and stability analyses with the full shortlist. Add a caveat on the 31% coverage of the high-yield spread. | *…* |
+| 6 | Change `data-preparation.ipynb` to the agreed split, and also export the continuous hourly series (version 3 already rebuilds it from the windows). | *…* |
+| 7 | Normalize each window by itself (prices relative to the last close of the window, volume relative to the window mean) instead of the global scaler. This is needed for the RNN/LSTM inputs. | *…* |
+| 8 | Move the data-quality check (gaps, zero-volume hours, extreme moves) into `data-preparation.ipynb` so it appears in the report. | *…* |
+| 9 | Fix the Yahoo Finance downloads in `Correlation Analyses/` (16 series failed), then rerun the lead-lag and stability analyses with the full shortlist. Add a caveat on the 31% coverage of the high-yield spread. | *…* |
 
 **Models and analysis**
 
 | # | Task | Owner |
 |---|---|---|
-| 9 | Rerun RNN/LSTM with the normalized windows (task 6), a robust loss (Huber or MAE), and the volatility / hourly-size targets, where version 3 found real signal. Compare with version 3's tree models on the same test block. | *…* |
-| 10 | Link the macro work to the models. Use Granger causality to check whether any macro variable leads BTC, and if so test it as a feature for the next-day volatility model. | *…* |
-| 11 | Optional: add a GARCH(1,1) benchmark for volatility (version 3 has HAR features but no GARCH), and calibrated ranges with conformal prediction (version 3, idea 1). | *…* |
+| 10 | Rerun RNN/LSTM with the normalized windows (task 7), a robust loss (Huber or MAE), and the volatility / hourly-size targets, where versions 3 and `v3-extensions` found real signal. Compare with their tree models on the same test block, ideally with monthly refits too. | *…* |
+| 11 | Link the macro work to the models. Use Granger causality to check whether any macro variable leads BTC, and if so test it as a feature for the next-day volatility model. | *…* |
+| 12 | Optional: add a GARCH(1,1) benchmark for volatility. No notebook has one yet (version 3 uses HAR features; the conformal ranges are already done in `v3-extensions.ipynb`). | *…* |
 
 **Report and README**
 
 | # | Task | Owner |
 |---|---|---|
-| 12 | Update *Main ideas* (the split dates there are out of date) and replace the version 1 tables in *Results* with the final, rerun numbers. | *…* |
-| 13 | Write the empty sections: *Data processing and analysis*, *Additional model work* (versions 2–3, RNN/LSTM, correlation analysis) and *LLMs* (each member notes how they used AI tools). | *…* |
-| 14 | Merge the correlation brief (`BTC_macro_correlation_results_brief.docx`) and `report_notes.md` into the README/report. | *…* |
+| 13 | Update *Main ideas* (the split dates there are out of date) and replace the version 1 tables in *Results* with the final, rerun numbers. | *…* |
+| 14 | Write the empty sections: *Data processing and analysis*, *Additional model work* (versions 2–3, course methods, `v3-extensions`, RNN/LSTM, correlation analysis) and *LLMs* (each member notes how they used AI tools). | *…* |
+| 15 | Merge the correlation brief (`BTC_macro_correlation_results_brief.docx`) and `report_notes.md` into the README/report. | *…* |
 
 ---
 
