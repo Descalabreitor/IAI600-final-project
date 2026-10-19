@@ -144,6 +144,7 @@ Why predict *changes* instead of prices? The price moved from a few dollars to o
 | Path | Content | Owner |
 |---|---|---|
 | `hourly-base-data.ipynb` | **Base data.** Continuous hourly series from the pinned Kaggle version, hidden-gap checks, cut at 2018 | Adrián P. |
+| `data-analysis.ipynb` | **Data analysis** on the base data: return distribution, autocorrelation and Ljung–Box tests, calendar patterns and their drift, volatility regimes and K-Means clusters, Binance / ETH, macro correlations. Conclusions copied from the archived notebooks | Adrián P. |
 | `data/btc_hourly.csv.gz` | Output of the base data: 76,851 hours (1 Jan 2018 → 8 Oct 2026) with the `filled_minutes` / `no_trade` flags | Adrián P. |
 | `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old `data-preparation.ipynb`, still read by the archived model notebooks | Adrián P. |
 | `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), created with `python -m utils.binance` | Filip |
@@ -157,12 +158,12 @@ The `utils/` package:
 
 | Module | Content | Used by |
 |---|---|---|
-| `utils/hourly.py` | Rebuilds the continuous hourly series from the windows; features, targets, metrics, Ljung–Box, Diebold–Mariano, block bootstrap | version 3, course methods, version 3 extensions |
-| `utils/binance.py` | Binance BTCUSDT / ETHUSDT download from data.binance.vision (SHA-256 checked) and the order-flow / ETH / ETH-vs-BTC attributes | version 3 extensions |
+| `utils/hourly.py` | Rebuilds the continuous hourly series from the windows; features, targets, metrics, Ljung–Box, Diebold–Mariano, block bootstrap | version 3, course methods, version 3 extensions, data analysis |
+| `utils/binance.py` | Binance BTCUSDT / ETHUSDT download from data.binance.vision (SHA-256 checked) and the order-flow / ETH / ETH-vs-BTC attributes | version 3 extensions, data analysis |
 | `utils/notebooks.py` | `run_shared_cells`: runs the setup cells of version 3 inside another notebook, without copying them | version 3 extensions |
-| `utils/macro.py` | FRED / Yahoo Finance downloads (cached in `.macro_cache/`), D / W / ME panels (`load_raw`, `build_panels`) and hourly macro features without lookahead (`build_macro_hourly`) | correlation notebooks |
-| `utils/correlation.py` | Correlation tables with FDR, pruning of redundant variables, lead-lag, per-year stability, heatmaps and rolling plots | correlation notebooks |
-| `utils/btc_data.py` | BTC daily / weekly / monthly OHLCV frames from the 1-minute Kaggle file, cached in `.btc_cache/` | `Correlation Analyses/` notebook |
+| `utils/macro.py` | FRED / Yahoo Finance downloads (cached in `.macro_cache/`), D / W / ME panels (`load_raw`, `build_panels`) and hourly macro features without lookahead (`build_macro_hourly`) | correlation notebooks, data analysis |
+| `utils/correlation.py` | Correlation tables with FDR, pruning of redundant variables, lead-lag, per-year stability, heatmaps and rolling plots | correlation notebooks, data analysis |
+| `utils/btc_data.py` | BTC daily / weekly / monthly OHLCV frames, from the base hourly series (`frames_from_hourly`) or from the 1-minute Kaggle file, cached in `.btc_cache/` (`load_btc`) | `data-analysis.ipynb`, `Correlation Analyses/` notebook |
 
 ---
 
