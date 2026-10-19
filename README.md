@@ -283,9 +283,45 @@ Baselines for comparison: **zero** (no change), **mean per hour** (≈ "always u
 
 ## 🧪 Aditional model work
 
+### Filip: course methods and extensions of version 3
+
+| File | Content |
+|---|---|
+| `course-methods.ipynb` | The project question answered only with the methods of the course labs (I–VI): preprocessing pipeline, regression for the next day's move size, classification for its direction, SVM, K-Means market regimes, Keras MLP (≈1 min to run). |
+| `v3-extensions.ipynb` | On top of version 3: Binance attributes for the move size, monthly refitting with recency weights, conformal calibration of the 80% ranges, next-hour direction (≈2 h to run). |
+| `binance_features.py` | Downloads Binance BTCUSDT / ETHUSDT 1-minute data from data.binance.vision (SHA-256 checked) into `data/binance_*_1h.csv.gz` (`python binance_features.py`), loads it and builds the order-flow / ETH / ETH-vs-BTC attributes. |
+| `shared_cells.py` | Runs the setup cells of Alberto's version 3 notebook inside another notebook (no copied code). |
+
+**Course methods (daily forecasts, test 2024 → Oct 2026):** the next day's move size is predictable (Linear Regression R² 0.48, SVR 0.46, Random Forest 0.41, MLP 0.37); its direction is not (all classifiers 49–51% accuracy, ROC-AUC ≈ 0.50). K-Means finds crash, rally, quiet and normal days; after crash days the next day's moves are about twice as big as after quiet days, but the direction is the same coin flip.
+
+**Main results (version-3 blocks, test Jul 2024 → Oct 2026):**
+- **Refitting every month** with sample weights halving every 12 months raises the hourly move-size R² from **0.124 to 0.148** (95% CI of the gain +0.018 to +0.029, better in 28 of 29 months). The half-life was chosen on the validation block.
+- **Rolling conformal calibration** brings the 80% ranges to **80.0% coverage** (77% before) and keeps 79–82% in calm, middle and wild hours; they are still 23% narrower than a fixed range.
+- **Binance order flow and ETH do not help**: neither for the move size (R² 0.121–0.126 vs 0.123) nor for the next-hour direction (AUC 0.537 with and without them).
+- **Next-hour direction** has a small, stable signal, mostly the reversal of the last hour: AUC 0.537, 55% correct on the 10% most confident forecasts (p < 10⁻⁴). Hours 2–24 stay a coin flip.
+
 ---
 
 ## 🧠 LLMs
 
 
 ---
+
+---
+
+## Models and hyperparameter tuning
+
+All notebooks read the output of `data-preparation.ipynb` (`data/btc_hourly_windows.npz`, `data/scaler.joblib`) without modifying it. Install the packages with `pip install -r requirements.txt` (Python 3.12).
+
+| File | Content |
+|---|---|
+| `bitcoin-models-new-data.ipynb` | **Version 1.** Scale-free features, walk-forward CV, Ridge / Lasso / KNN / Random Forest / Gradient Boosting / MLP on the 24 hourly returns, alternative daily targets (return, direction, volatility). |
+| `bitcoin-models-2018-2026.ipynb` | **Version 2.** Only 2018–2026 data, fixed train / validation / test blocks (2018–2022 / 2023–Jun 2024 / Jul 2024–Oct 2026), test of whether the early years hurt. |
+| `bitcoin-models-v3.ipynb` | **Version 3 (final).** Why the hourly forecasts look like noise, and 14 improvements tested one by one and together (≈45 min to run). |
+| `btc_utils.py` | Shared helpers of version 3: rebuilding the continuous hourly series, features, targets, metrics, Ljung–Box, Diebold–Mariano and block-bootstrap. |
+
+**Main results (test block Jul 2024 → Oct 2026):**
+- Hourly returns are close to a random walk: no model beats the "0%" forecast in a statistically reliable way (best IC ≈ 0.02, R²_oos ≈ 0).
+- The *size* of each of the next 24 hourly moves is predictable: one long-format Gradient Boosting / ensemble model reaches R² ≈ 0.12, 2.2× a simple volatility rule.
+- Quantile models give 80% ranges for every hour that are 36% narrower than fixed ranges and adapt to calm and wild periods.
+- Next-day volatility is predictable (R² ≈ 0.46–0.50); next-day direction is not (AUC 0.52, not significant).
