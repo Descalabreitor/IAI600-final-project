@@ -1,6 +1,10 @@
-# Ignore the data CSV file in the repository
+.ipynb_checkpoints/
+models-and-hyperparameters-v2
+__pycache__/
+.vscode/
+
+# data: raw downloads and caches (re-created by the scripts)
+data/raw/
 btcusd_1-min_data.csv
 .macro_cache/
-.vscode/
-__pycache__/
-data/raw/
+.btc_cache/
