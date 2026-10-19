@@ -1,5 +1,5 @@
 """
-corr_tools.py - correlation analysis utilities for the panels built by macro_panel.py
+correlation.py - correlation analysis utilities for the panels built by utils.macro
 
 Pipeline: prune_panels (drop redundant macro variables, independent of BTC)
           -> corr_summary (correlation with BTC) -> lead_lag / corr_by_year (focus list).
@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
+from scipy.cluster.hierarchy import leaves_list, linkage
+from scipy.spatial.distance import squareform
 
 TARGETS = ("BTC_ret", "BTC_absret")
 
@@ -159,6 +161,15 @@ def corr_by_year(panel: pd.DataFrame, variables, target: str = "BTC_ret",
     for y, g in panel.groupby(panel.index.year):
         out[y] = {v: g[target].corr(g[v], method=method, min_periods=min_obs) for v in variables}
     return pd.DataFrame(out).T
+
+
+def cluster_order(corr: pd.DataFrame) -> list:
+    """Hierarchical order (distance 1-|r|) so that redundant variables sit together."""
+    d = (1 - corr.abs().fillna(0)).values
+    d = (d + d.T) / 2
+    np.fill_diagonal(d, 0)
+    leaves = leaves_list(linkage(squareform(d, checks=False), "average"))
+    return list(corr.index[leaves])
 
 
 def heatmap(df: pd.DataFrame, title: str = "", vmax: float | None = None,

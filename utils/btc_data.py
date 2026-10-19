@@ -1,5 +1,5 @@
 """
-btc_data.py - BTC OHLCV loading for the correlation analysis.
+btc_data.py - BTC daily / weekly / monthly OHLCV loading for the correlation analysis.
 
 Only the three frames the analysis uses are built (daily, weekly, monthly). The 1-minute
 file is read inside a function, so it is released as soon as the frames are built, and the

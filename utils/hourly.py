@@ -1,4 +1,4 @@
-"""Helper functions for bitcoin-models-v3.ipynb.
+"""Hourly BTC series, features, targets and metrics (written for bitcoin-models-v3.ipynb).
 
 Everything here is a model-side transformation of the files produced by the data-preparation
 step (data/btc_hourly_windows.npz and data/scaler.joblib); those files are never modified.

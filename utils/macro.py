@@ -1,8 +1,13 @@
 """
-macro_panel.py - expanded macro variables and D / W / ME panels for correlation
-analysis against BTC.
+macro.py - macro variables (FRED / Yahoo Finance) aligned to BTC without lookahead.
 
-Differences compared with the old macro_features.py:
+Two uses:
+  * Correlation analysis: build_panels gives D / W / ME panels. Do not correlate
+    macro series repeated every hour with hourly returns.
+  * Modelling: build_macro_hourly gives the features on BTC's hourly index, always
+    aligned by availability date (observation + publication lag).
+
+Design:
   * ~40 variables (rates, curve, liquidity, credit, FX, commodities, global
     equities, inflation, labour, activity).
   * Disk cache (.macro_cache/) and retries: not everything is re-downloaded on
@@ -20,6 +25,7 @@ Usage:
     macro = load_raw()                                   # download / read cache ONCE
     panels, meta = build_panels(close, macro)            # close = {"D": Series, "W": ..., "ME": ...}
     panels_pit, _ = build_panels(close, macro, pit=True, freqs=("D", "W"))
+    features = build_macro_hourly(hourly.index, macro)   # hourly modelling features
 
 Dependencies: pandas, numpy, yfinance
 """
@@ -34,7 +40,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-MAX_ATEMPTS = 3
+MAX_ATTEMPTS = 3
 
 CACHE = Path(".macro_cache")
 
@@ -126,7 +132,7 @@ def load_fred(series_id: str, max_age_h: float = 24) -> pd.Series:
     if not _fresh(p, max_age_h):
         url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
         ok, last = False, None
-        for attempt in range(MAX_ATEMPTS):
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 pd.read_csv(url, index_col=0, parse_dates=True, na_values=".").to_csv(p)
                 ok = True
@@ -299,3 +305,38 @@ def build_panels(btc_close: dict, macro: MacroData, pit: bool = False, freqs=Non
         panels[freq] = pd.DataFrame(cols).loc[pd.Timestamp(start):]
 
     return panels, macro.meta[macro.meta["name"].isin(kept)].set_index("name")
+
+
+# ------------------------------- hourly features ----------------------------
+DEFAULT_LEVELS = ("US10Y", "FedFunds", "Curve_10Y2Y", "VIX", "HY_OAS")
+DEFAULT_YOY = ("M2", "CPI", "CorePCE")
+
+
+def build_macro_hourly(hourly_index: pd.DatetimeIndex, macro: MacroData | None = None,
+                       add_levels=DEFAULT_LEVELS, add_yoy=DEFAULT_YOY, **kw) -> pd.DataFrame:
+    """Macro features aligned to a naive UTC hourly index, without lookahead.
+
+    Alignment is always by availability date (pit=True). The transformation (difference /
+    log return) is computed on the native observations, already indexed by availability,
+    and then forward-filled with a maximum tolerance per frequency (STALE_TOL), so a
+    discontinued series becomes NaN instead of staying frozen.
+
+    macro:      result of load_raw(); if None it is loaded here, passing **kw to load_raw
+                (data_start, refresh_hours, ...).
+    add_levels: variables whose LEVEL is added as <name>_lvl (regime).
+    add_yoy:    monthly variables whose year-over-year change is added as <name>_yoy.
+    """
+    macro = load_raw(**kw) if macro is None else macro
+    levels = align_levels(macro, pit=True)
+    idx = pd.DatetimeIndex(hourly_index)
+    cols = {}
+    for m in macro.meta.to_dict("records"):
+        name, lv, tol = m["name"], levels[m["name"]], STALE_TOL[m["native"]]
+        cols[name] = _transform(lv, m["transform"]).dropna().reindex(
+            idx, method="ffill", tolerance=tol)
+        if name in add_levels:
+            cols[f"{name}_lvl"] = lv.reindex(idx, method="ffill", tolerance=tol)
+        if name in add_yoy and m["native"] == "M":
+            yoy = (lv / lv.shift(12) - 1) * 100       # 12 monthly observations
+            cols[f"{name}_yoy"] = yoy.dropna().reindex(idx, method="ffill", tolerance=tol)
+    return pd.DataFrame(cols, index=hourly_index)
