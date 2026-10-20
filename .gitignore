@@ -8,3 +8,4 @@ data/
 btcusd_1-min_data.csv
 .macro_cache/
 .btc_cache/
+CLAUDE.md
