@@ -65,6 +65,50 @@ def corr_summary(panel: pd.DataFrame, method: str = "spearman", min_obs: int = 4
     return out.reindex(out["r_ret"].abs().sort_values(ascending=False).index)
 
 
+def weekday_rank_corr(a: pd.Series, b: pd.Series):
+    """Spearman correlation within weekdays: ranks minus their weekday mean, then Pearson.
+
+    In the weekday-only daily panel BTC's Monday return covers Friday -> Monday (3 days), so
+    |BTC| is larger on Mondays. Any variable whose size has a weekday pattern (e.g. a series
+    published with a 7-day lag, which repeats a value on one weekday and doubles up on another)
+    would correlate with |BTC| for that reason alone. Comparing within weekdays removes it.
+    Returns (r, p, n).
+    """
+    d = pd.concat([a, b], axis=1).dropna()
+    rk = d.rank()
+    rk = rk - rk.groupby(d.index.dayofweek).transform("mean")
+    r, p = stats.pearsonr(rk.iloc[:, 0], rk.iloc[:, 1])
+    return r, p, len(d)
+
+
+def size_summary(panel: pd.DataFrame, lag: int = 0, method: str = "spearman",
+                 min_obs: int = 40, within_weekday: bool = False) -> pd.DataFrame:
+    """Size of BTC's moves vs size of each variable's moves: corr(|BTC_t|, |X_{t-lag}|).
+
+    corr_summary's r_abs correlates |BTC| with the SIGNED change of X, which only asks whether
+    big BTC moves come with rises or with falls of X. This asks whether they come with big moves
+    of X in either direction (co-volatility). lag=0: same period; lag=1: X's previous period
+    (use a pit=True panel for that). within_weekday=True (daily panel): Spearman within weekdays,
+    see weekday_rank_corr. q is Benjamini-Hochberg adjusted. Sorted by |r|.
+    """
+    y = panel["BTC_absret"]
+    rows = []
+    for c in panel.columns:
+        if c in TARGETS:
+            continue
+        d = pd.concat([y, panel[c].abs().shift(lag)], axis=1).dropna()
+        if len(d) < min_obs or d.iloc[:, 1].nunique() < 3:
+            continue
+        if within_weekday:
+            r, p, _ = weekday_rank_corr(d.iloc[:, 0], d.iloc[:, 1])
+        else:
+            r, p = (stats.spearmanr if method == "spearman" else stats.pearsonr)(d.iloc[:, 0], d.iloc[:, 1])
+        rows.append((c, len(d), r, p))
+    out = pd.DataFrame(rows, columns=["var", "n", "r", "p"]).set_index("var")
+    out["q"] = _bh(out["p"].values)
+    return out.drop(columns="p").reindex(out["r"].abs().sort_values(ascending=False).index)
+
+
 def prune_panels(panels: dict, threshold: float = 0.85, method: str = "spearman",
                  min_obs: int = 40, prefer=()):
     """Drop macro variables that are redundant with another macro variable.
