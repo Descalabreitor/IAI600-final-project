@@ -98,6 +98,8 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 | `hourly-base-data.ipynb`, `data-analysis.ipynb`, `classical-models.ipynb`, `neural-models.ipynb` | The four project notebooks (see above) |
 | `data/btc_hourly.csv.gz` | Base data: `Open, High, Low, Close, Volume, Return, filled_minutes, no_trade` |
 | `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), from `python -m utils.binance` |
+| `data/macro_raw.csv.gz` | Frozen copy of the FRED / Yahoo Finance macro series (written by the first run of `data-analysis.ipynb` §8), so everybody uses the same macro data |
+| `data/release_dates.csv` | US CPI, payrolls and FOMC release times 2018 → 2026 (BLS archives, Federal Reserve calendars), for the release-day analysis (`data-analysis.ipynb` §8.7) |
 | `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old data preparation, read only by the archived notebooks |
 | `utils/` | Shared helpers imported by the notebooks |
 | `old_notebooks/` | Archived notebooks, superseded by the four above. [Their summary](old_notebooks/README.md) |
@@ -108,7 +110,7 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 |---|---|---|
 | `utils/hourly.py` | Features, targets, metrics, Ljung–Box, Diebold–Mariano, block bootstrap | data analysis, classical, neural |
 | `utils/binance.py` | Binance download from data.binance.vision (SHA-256 checked), order-flow / ETH / ETH-vs-BTC attributes | data analysis, classical |
-| `utils/macro.py` | FRED / Yahoo Finance downloads (cached in `.macro_cache/`), D / W / ME panels, hourly macro features without lookahead | data analysis, correlation |
+| `utils/macro.py` | FRED / Yahoo Finance downloads (cached in `.macro_cache/`) and the frozen copy in `data/` (`load_macro`), D / W / ME panels, level panels, hourly macro features without lookahead | data analysis, correlation |
 | `utils/correlation.py` | Correlation tables with FDR, pruning, lead-lag, per-year stability, plots | data analysis, correlation |
 | `utils/btc_data.py` | Daily / weekly / monthly BTC frames from the base data (`frames_from_hourly`) or the 1-minute file (`load_btc`) | data analysis, correlation |
 | `utils/notebooks.py` | Runs the setup cells of version 3 inside another notebook | archived `v3-extensions.ipynb` |
@@ -120,7 +122,7 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 1. **Environment.** Python 3.12 and `pip install -r requirements.txt`. A CUDA GPU speeds up `neural-models.ipynb`; PyTorch falls back to the CPU.
 2. **Notebooks.** Run them from the repo root, in the order of the table above. `data/btc_hourly.csv.gz` is already in the repo; rebuilding it gives the same file, because the Kaggle version is pinned.
 3. **Binance data.** Already in the repo. To extend it to the latest day: `python -m utils.binance`.
-4. **Macro data.** Downloads are cached in `.macro_cache/` and `.btc_cache/`; delete them to force a fresh download.
+4. **Macro data.** `data-analysis.ipynb` reads the frozen copy `data/macro_raw.csv.gz`; if it is missing, the first run downloads every series and writes it. To download again set `REFRESH_MACRO = True` in its section 1 and commit the new file through a pull request. `data/` is in `.gitignore`, so new data files need `git add -f`. The `Correlation Analyses/` notebook still downloads through `.macro_cache/` and `.btc_cache/`.
 5. **Archived notebooks.** See [`old_notebooks/README.md`](old_notebooks/README.md).
 
 After changing a file in `utils/`, restart the notebook kernel: Python keeps imported modules in memory.
@@ -151,7 +153,7 @@ After changing a file in `utils/`, restart the notebook kernel: Python keeps imp
 | 8 | **Write the conclusions of `neural-models.ipynb`** (§3–§9 are marked *Pending*) and replace "Run time pending" in its header with ≈ 133 min | ⏳ Pending | *…* |
 | 9 | **Review the "What we see" texts** of `data-analysis.ipynb` and `classical-models.ipynb`: they are quoted from the archived runs and some numbers no longer match the outputs (e.g. K-Means cluster sizes, course-methods results). Rewrite them on this run | ⏳ Pending | *…* |
 | 10 | **Fix the Yahoo Finance downloads.** The last run of `data-analysis.ipynb` failed with `No module named 'yfinance'`: install it (it is in `requirements.txt`) and rerun §8, so S&P 500, VIX, DXY and gold are back in the lead-lag and stability analyses. HY_OAS covers only 34% of the daily panel | ✅ Done | Adrián P. |
-| 11 | Link the macro work to the models: Granger causality, and macro features in the next-day volatility model | ⏳ Pending | *…* |
+| 11 | Link the macro work to the models: Granger causality, and macro features in the next-day volatility model | 🔄 In progress: `data-analysis.ipynb` §8.6–8.8 (size of the moves, release days, out-of-sample volatility test); Granger still pending | Adrián M. |
 | 12 | Add a GARCH(1,1) benchmark for volatility | ⏳ Pending (optional) | *…* |
 | 13 | Decide what to do with `Correlation Analyses/`: `data-analysis.ipynb` §8 now repeats it on the base data (from 2018). Archive it or keep it as the reference for the brief | ⏳ Pending | *…* |
 | 14 | Write the *Use of LLMs* section and the final report (from `report_notes.md` and this README) | ⏳ Pending | everybody |
