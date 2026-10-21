@@ -100,6 +100,7 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 | `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), from `python -m utils.binance` |
 | `data/macro_raw.csv.gz` | Frozen copy of the FRED / Yahoo Finance macro series (written by the first run of `data-analysis.ipynb` §8), so everybody uses the same macro data |
 | `data/release_dates.csv` | US CPI, payrolls and FOMC release times 2018 → 2026 (BLS archives, Federal Reserve calendars), for the release-day analysis (`data-analysis.ipynb` §8.7) |
+| `data/features_hourly.csv.gz` | Candidate features for the models (volatility ratios, clock, release hours, VIX), one row per hour from 2020, built and checked in `data-analysis.ipynb` §9; no targets |
 | `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old data preparation, read only by the archived notebooks |
 | `utils/` | Shared helpers imported by the notebooks |
 | `old_notebooks/` | Archived notebooks, superseded by the four above. [Their summary](old_notebooks/README.md) |
