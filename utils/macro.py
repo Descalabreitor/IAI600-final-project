@@ -22,7 +22,8 @@ Design:
     which is the correct one if you want to claim that X "leads" BTC.
 
 Usage:
-    macro = load_raw()                                   # download / read cache ONCE
+    macro = load_macro("data/macro_raw.csv.gz")          # frozen copy (downloads + saves it the first time)
+    macro = load_raw()                                   # or: download / read cache
     panels, meta = build_panels(close, macro)            # close = {"D": Series, "W": ..., "ME": ...}
     panels_pit, _ = build_panels(close, macro, pit=True, freqs=("D", "W"))
     features = build_macro_hourly(hourly.index, macro)   # hourly modelling features
@@ -210,16 +211,13 @@ def load_raw(data_start: str = "2012-01-01", refresh_hours: float = 24,
     """Download (or read from cache) every series once. Failed series are skipped."""
     fred_specs = FRED_SPECS if fred_specs is None else fred_specs
     yf_specs = YF_SPECS if yf_specs is None else yf_specs
-    raw, meta, failed = {}, [], []
+    raw, failed = {}, []
 
     for name, (sid, lag, native, tf, group) in fred_specs.items():
         try:
             raw[name] = load_fred(sid, refresh_hours)
         except Exception as e:
             failed.append((name, str(e)[:90]))
-            continue
-        meta.append(dict(name=name, source="FRED", id=sid, native=native, lag=lag,
-                         transform=tf, group=group))
 
     try:
         px = load_yf([t for t, _ in yf_specs.values()], data_start, refresh_hours)
@@ -231,17 +229,66 @@ def load_raw(data_start: str = "2012-01-01", refresh_hours: float = 24,
             failed.append((name, f"no data for {tkr}"))
             continue
         raw[name] = px[tkr].dropna()
-        meta.append(dict(name=name, source="Yahoo", id=tkr, native="D", lag=1,
-                         transform="logret", group=group))
 
+    if failed:
+        print("Skipped series:", *[f"  {n}: {m}" for n, m in failed], sep="\n")
+    return MacroData(raw, _meta_for(raw, fred_specs, yf_specs), failed)
+
+
+def _meta_for(raw: dict, fred_specs=None, yf_specs=None) -> pd.DataFrame:
+    """Metadata rows (source, id, frequency, lag, transform, group) for the series in `raw`."""
+    fred_specs = FRED_SPECS if fred_specs is None else fred_specs
+    yf_specs = YF_SPECS if yf_specs is None else yf_specs
+    meta = []
+    for name, (sid, lag, native, tf, group) in fred_specs.items():
+        if name in raw:
+            meta.append(dict(name=name, source="FRED", id=sid, native=native, lag=lag,
+                             transform=tf, group=group))
+    for name, (tkr, group) in yf_specs.items():
+        if name in raw:
+            meta.append(dict(name=name, source="Yahoo", id=tkr, native="D", lag=1,
+                             transform="logret", group=group))
     # Net liquidity = Fed balance sheet - TGA - ON RRP (derived in align_levels).
     if all(k in raw for k in NET_LIQ_PARTS):
         meta.append(dict(name="NetLiquidity", source="derived", id="WALCL-WTREGEN-RRP",
                          native="W", lag=0, transform="logret", group="liquidity"))
+    return pd.DataFrame(meta)
 
-    if failed:
-        print("Skipped series:", *[f"  {n}: {m}" for n, m in failed], sep="\n")
-    return MacroData(raw, pd.DataFrame(meta), failed)
+
+# ------------------------------- frozen copy ----------------------------------
+def save_frozen(macro: MacroData, path) -> None:
+    """Save the raw series (observation date, value) to one CSV, so every run uses the same data.
+
+    FRED and Yahoo have no fixed versions: series are revised, adjusted prices change after
+    dividends, and the cache is not in git. Saving one frozen copy in data/ makes the results
+    reproducible for the whole group. Long format: name, date, value.
+    """
+    long = pd.concat({n: s.rename("value") for n, s in macro.raw.items()}, names=["name", "date"])
+    long.reset_index().to_csv(path, index=False, float_format="%.10g")
+
+
+def load_frozen(path) -> MacroData:
+    """Read a copy written by save_frozen. Metadata comes from FRED_SPECS / YF_SPECS."""
+    long = pd.read_csv(path, parse_dates=["date"])
+    raw = {n: g.set_index("date")["value"].astype(float).rename(None)
+           for n, g in long.groupby("name", sort=False)}
+    known = set(FRED_SPECS) | set(YF_SPECS)
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        warnings.warn(f"series without specs are ignored: {unknown}")
+        raw = {n: s for n, s in raw.items() if n in known}
+    return MacroData(raw, _meta_for(raw), [])
+
+
+def load_macro(path, refresh: bool = False, data_start: str = "2012-01-01") -> MacroData:
+    """Frozen copy if it exists (and refresh is False); otherwise download and freeze it."""
+    path = Path(path)
+    if path.exists() and not refresh:
+        return load_frozen(path)
+    macro = load_raw(data_start=data_start)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    save_frozen(macro, path)
+    return macro
 
 
 def align_levels(macro: MacroData, pit: bool) -> dict:
@@ -305,6 +352,30 @@ def build_panels(btc_close: dict, macro: MacroData, pit: bool = False, freqs=Non
         panels[freq] = pd.DataFrame(cols).loc[pd.Timestamp(start):]
 
     return panels, macro.meta[macro.meta["name"].isin(kept)].set_index("name")
+
+
+def level_panel(btc_close: pd.Series, macro: MacroData, names, freq: str = "D", pit: bool = True,
+                start: str = "2017-01-01", weekdays_only: bool = True) -> pd.DataFrame:
+    """LEVELS (not changes) of some macro variables at the end of each BTC period.
+
+    Same alignment as build_panels (the value known at the end of the period, at most
+    STALE_TOL old), but untransformed: e.g. the VIX level as a measure of market stress.
+    Default pit=True, so with .shift(1) a row only holds values known before the period starts.
+    """
+    levels = align_levels(macro, pit)
+    spec = macro.meta.set_index("name")
+    btc = btc_close.dropna()
+    if freq == "D" and weekdays_only:
+        btc = btc[btc.index.dayofweek < 5]
+    end = btc.index + pd.Timedelta(days=1)
+    cols = {}
+    for n in names:
+        if n not in levels:
+            continue
+        x = levels[n].reindex(end, method="ffill", tolerance=STALE_TOL[spec.at[n, "native"]])
+        x.index = btc.index
+        cols[n] = x
+    return pd.DataFrame(cols, index=btc.index).loc[pd.Timestamp(start):]
 
 
 # ------------------------------- hourly features ----------------------------

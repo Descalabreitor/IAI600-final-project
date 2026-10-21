@@ -10,6 +10,7 @@ torch==2.14.1          # only model_test.ipynb (RNN / LSTM)
 kagglehub==1.0.2       # Kaggle download: hourly-base-data, data-preparation, correlation notebooks
 mplfinance==0.12.10b0  # candle charts: data-preparation, correlation notebooks
 yfinance==1.7.0        # Yahoo Finance series in utils/macro.py
+jinja2                 # DataFrame.style tables: data-analysis, classical-models
 # to run the notebooks
 ipykernel==7.4.0
 nbconvert==7.17.1

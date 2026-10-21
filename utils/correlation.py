@@ -65,6 +65,50 @@ def corr_summary(panel: pd.DataFrame, method: str = "spearman", min_obs: int = 4
     return out.reindex(out["r_ret"].abs().sort_values(ascending=False).index)
 
 
+def weekday_rank_corr(a: pd.Series, b: pd.Series):
+    """Spearman correlation within weekdays: ranks minus their weekday mean, then Pearson.
+
+    In the weekday-only daily panel BTC's Monday return covers Friday -> Monday (3 days), so
+    |BTC| is larger on Mondays. Any variable whose size has a weekday pattern (e.g. a series
+    published with a 7-day lag, which repeats a value on one weekday and doubles up on another)
+    would correlate with |BTC| for that reason alone. Comparing within weekdays removes it.
+    Returns (r, p, n).
+    """
+    d = pd.concat([a, b], axis=1).dropna()
+    rk = d.rank()
+    rk = rk - rk.groupby(d.index.dayofweek).transform("mean")
+    r, p = stats.pearsonr(rk.iloc[:, 0], rk.iloc[:, 1])
+    return r, p, len(d)
+
+
+def size_summary(panel: pd.DataFrame, lag: int = 0, method: str = "spearman",
+                 min_obs: int = 40, within_weekday: bool = False) -> pd.DataFrame:
+    """Size of BTC's moves vs size of each variable's moves: corr(|BTC_t|, |X_{t-lag}|).
+
+    corr_summary's r_abs correlates |BTC| with the SIGNED change of X, which only asks whether
+    big BTC moves come with rises or with falls of X. This asks whether they come with big moves
+    of X in either direction (co-volatility). lag=0: same period; lag=1: X's previous period
+    (use a pit=True panel for that). within_weekday=True (daily panel): Spearman within weekdays,
+    see weekday_rank_corr. q is Benjamini-Hochberg adjusted. Sorted by |r|.
+    """
+    y = panel["BTC_absret"]
+    rows = []
+    for c in panel.columns:
+        if c in TARGETS:
+            continue
+        d = pd.concat([y, panel[c].abs().shift(lag)], axis=1).dropna()
+        if len(d) < min_obs or d.iloc[:, 1].nunique() < 3:
+            continue
+        if within_weekday:
+            r, p, _ = weekday_rank_corr(d.iloc[:, 0], d.iloc[:, 1])
+        else:
+            r, p = (stats.spearmanr if method == "spearman" else stats.pearsonr)(d.iloc[:, 0], d.iloc[:, 1])
+        rows.append((c, len(d), r, p))
+    out = pd.DataFrame(rows, columns=["var", "n", "r", "p"]).set_index("var")
+    out["q"] = _bh(out["p"].values)
+    return out.drop(columns="p").reindex(out["r"].abs().sort_values(ascending=False).index)
+
+
 def prune_panels(panels: dict, threshold: float = 0.85, method: str = "spearman",
                  min_obs: int = 40, prefer=()):
     """Drop macro variables that are redundant with another macro variable.
@@ -195,20 +239,54 @@ def heatmap(df: pd.DataFrame, title: str = "", vmax: float | None = None,
     return fig
 
 
+def rolling_corr(panel: pd.DataFrame, variable: str, window: int = 180, target: str = "BTC_ret",
+                 method: str = "pearson", min_frac: float = 0.8) -> pd.Series:
+    """Rolling correlation of `variable` with `target` over the last `window` rows.
+
+    method="spearman" ranks the values inside each window (rank correlation), so a single
+    extreme day cannot move the result much; "pearson" uses the raw values. A window needs
+    at least min_frac * window complete pairs, otherwise the value is NaN.
+    """
+    d = panel[[target, variable]]
+    if method == "pearson":
+        return d[target].rolling(window, min_periods=int(window * min_frac)).corr(d[variable])
+    y, x = d[target].to_numpy(float), d[variable].to_numpy(float)
+    out = np.full(len(d), np.nan)
+    for i in range(window, len(d) + 1):
+        a, b = y[i - window:i], x[i - window:i]
+        ok = ~(np.isnan(a) | np.isnan(b))
+        if ok.sum() >= window * min_frac:
+            out[i - 1] = stats.spearmanr(a[ok], b[ok])[0]
+    return pd.Series(out, index=d.index, name=variable)
+
+
 def rolling_corr_plot(panel: pd.DataFrame, variables, window: int = 180,
                       target: str = "BTC_ret", method: str = "pearson",
-                      absolute: bool = False):
-    """Plot rolling correlation, optionally as absolute magnitudes."""
+                      absolute: bool = False, background: pd.Series | None = None,
+                      background_label: str = ""):
+    """Plot rolling correlations (signed by default, or absolute magnitudes).
+
+    background: optional series drawn in grey on a second axis (e.g. the VIX level), to
+    compare the correlation with market conditions. Returns (fig, {variable: series}).
+    """
     fig, ax = plt.subplots(figsize=(12, 5))
+    series = {}
+    if background is not None:
+        ax2 = ax.twinx()
+        ax2.fill_between(background.index, background.to_numpy(float), color="#d9d8d3", alpha=0.6, lw=0)
+        ax2.set_ylabel(background_label, color="#7a7974")
+        ax2.tick_params(axis="y", colors="#7a7974")
+        ax.set_zorder(ax2.get_zorder() + 1)
+        ax.patch.set_visible(False)
     for v in variables:
-        corr = panel[target].rolling(window, min_periods=int(window * 0.8)).corr(panel[v])
-        if absolute:
-            corr = corr.abs()
-        corr.plot(ax=ax, label=v, linewidth=1.2)
+        corr = rolling_corr(panel, v, window, target, method)
+        series[v] = corr
+        shown = corr.abs() if absolute else corr
+        ax.plot(shown.index, shown.to_numpy(float), label=v, linewidth=1.2)
     if not absolute:
         ax.axhline(0, color="black", linewidth=0.8)
-    title = "Absolute rolling correlation" if absolute else "Rolling correlation"
-    ax.set_title(f"{title} with {target} (window = {window} periods)")
-    ax.legend(ncol=3, fontsize=8)
+    kind = "Absolute rolling" if absolute else "Rolling"
+    ax.set_title(f"{kind} {method.capitalize()} correlation with {target} (window = {window} periods)")
+    ax.legend(ncol=3, fontsize=8, loc="upper left")
     fig.tight_layout()
-    return fig
+    return fig, series
