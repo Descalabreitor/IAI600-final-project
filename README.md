@@ -153,7 +153,7 @@ After changing a file in `utils/`, restart the notebook kernel: Python keeps imp
 | 8 | **Write the conclusions of `neural-models.ipynb`** (§3–§9 are marked *Pending*) and replace "Run time pending" in its header with ≈ 133 min | ⏳ Pending | *…* |
 | 9 | **Review the "What we see" texts** of `data-analysis.ipynb` and `classical-models.ipynb`: they are quoted from the archived runs and some numbers no longer match the outputs (e.g. K-Means cluster sizes, course-methods results). Rewrite them on this run | ⏳ Pending | *…* |
 | 10 | **Fix the Yahoo Finance downloads.** The last run of `data-analysis.ipynb` failed with `No module named 'yfinance'`: install it (it is in `requirements.txt`) and rerun §8, so S&P 500, VIX, DXY and gold are back in the lead-lag and stability analyses. HY_OAS covers only 34% of the daily panel | ✅ Done | Adrián P. |
-| 11 | Link the macro work to the models: Granger causality, and macro features in the next-day volatility model | 🔄 In progress: `data-analysis.ipynb` §8.6–8.8 (size of the moves, release days, out-of-sample volatility test); Granger still pending | Adrián M. |
+| 11 | Link the macro work to the models: Granger causality, and macro features in the next-day volatility model | 🔄 In progress: `data-analysis.ipynb` §8.6–8.7 (size of the moves, release days); Granger still pending | Adrián M. |
 | 12 | Add a GARCH(1,1) benchmark for volatility | ⏳ Pending (optional) | *…* |
 | 13 | Decide what to do with `Correlation Analyses/`: `data-analysis.ipynb` §8 now repeats it on the base data (from 2018). Archive it or keep it as the reference for the brief | ⏳ Pending | *…* |
 | 14 | Write the *Use of LLMs* section and the final report (from `report_notes.md` and this README) | ⏳ Pending | everybody |
