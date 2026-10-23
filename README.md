@@ -99,7 +99,7 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 | `data/btc_hourly.csv.gz` | Base data: `Open, High, Low, Close, Volume, Return, filled_minutes, no_trade` |
 | `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), from `python -m utils.binance` |
 | `data/macro_raw.csv.gz` | Frozen copy of the FRED / Yahoo Finance macro series (written by the first run of `data-analysis.ipynb` §8), so everybody uses the same macro data |
-| `data/release_dates.csv` | US CPI, payrolls and FOMC release times 2018 → 2026 (BLS archives, Federal Reserve calendars), for the release-day analysis (`data-analysis.ipynb` §8.7) |
+| `data/release_dates.csv` | US CPI, payrolls and FOMC release times 2018 → 2026 (BLS archives, Federal Reserve calendars), for the release-day analysis (`data-analysis.ipynb` §8.7 and §9); rebuilt with `python -m utils.release_dates` |
 | `data/features_hourly.csv.gz` | Candidate features for the models (volatility ratios, clock, release hours, VIX), one row per hour from 2020, built and checked in `data-analysis.ipynb` §9; no targets |
 | `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old data preparation, read only by the archived notebooks |
 | `utils/` | Shared helpers imported by the notebooks |
@@ -115,6 +115,7 @@ Networks against the classical reference (bootstrap, 95% CI of the difference):
 | `utils/correlation.py` | Correlation tables with FDR, pruning, lead-lag, per-year stability, plots | data analysis, correlation |
 | `utils/btc_data.py` | Daily / weekly / monthly BTC frames from the base data (`frames_from_hourly`) or the 1-minute file (`load_btc`) | data analysis, correlation |
 | `utils/notebooks.py` | Runs the setup cells of version 3 inside another notebook | archived `v3-extensions.ipynb` |
+| `utils/release_dates.py` | US CPI, payrolls and FOMC release times with their sources; writes `data/release_dates.csv` | data analysis |
 
 ---
 
