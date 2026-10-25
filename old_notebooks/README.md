@@ -12,7 +12,7 @@ The project's notebooks before the unification of 19 Oct 2026. Their experiments
 | `bitcoin-models-2018-2026.ipynb` (version 2) | Alberto | Version 1 with data from 2018 and three fixed blocks (train 2018–2022, val 2023–Jun 2024, test Jul 2024–Oct 2026) | `classical-models.ipynb` §3, §8 |
 | `bitcoin-models-v3.ipynb` (version 3) | Alberto | Why returns look like noise, and 14 improvements: long format, hourly \|r\| target, quantile ranges, metric-matched selection, Diebold–Mariano, HAR / range features, ensembles, economic test, bootstrap (~45 min) | `data-analysis.ipynb` §4–5, `classical-models.ipynb` §4–11 |
 | `v3-extensions.ipynb` | Filip | On top of version 3: Binance / ETH attributes, monthly refits with recency weights, conformal ranges, next-hour direction (~2 h) | `classical-models.ipynb` §5–7 |
-| `course-methods.ipynb` | Filip | The project question with only the course-lab methods (I–VI): pipeline, regression, classification, SVM, K-Means, Keras MLP; daily forecasts, train 2018–2023, test 2024+ (~1 min) | `classical-models.ipynb` §9, `data-analysis.ipynb` §6, `neural-models.ipynb` §7 |
+| `course-methods.ipynb` | Filip | The project question with only the course-lab methods (I–VI): pipeline, regression, classification, SVM, K-Means, Keras MLP; daily forecasts, train 2018–2023, test 2024+ (~1 min) | `classical-models.ipynb` §9, `data-analysis.ipynb` §6 |
 | `model_test.ipynb` | Adrián P. | RNN and LSTM in PyTorch on the 168 h windows, scaled and raw inputs, MSE loss | `neural-models.ipynb` §3 |
 | `correlation_analyses.ipynb` | Adri "no chacho" | First version of the macro correlation notebook (now in `Correlation Analyses/`) | `data-analysis.ipynb` §8 |
 

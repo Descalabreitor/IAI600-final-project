@@ -5,8 +5,11 @@ scipy==1.18.1
 scikit-learn==1.9.1
 matplotlib==3.11.2
 joblib==1.6.0
-tensorflow==2.21.0     # only course-methods.ipynb (Keras MLP)
-torch==2.14.1          # only model_test.ipynb (RNN / LSTM)
+tensorflow==2.21.0     # old_notebooks/course-methods.ipynb (Keras MLP)
+torch==2.14.1          # neural-models.ipynb (MLP, LSTM); on an NVIDIA GPU install the CUDA build:
+                       #   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu130
+timestral @ git+https://github.com/mistralai/timestral.git@a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff
+                       # timestral-zero-shot.ipynb (Mistral's Timestral 1.0, inference only; not on PyPI)
 kagglehub==1.0.2       # Kaggle download: hourly-base-data, data-preparation, correlation notebooks
 mplfinance==0.12.10b0  # candle charts: data-preparation, correlation notebooks
 yfinance==1.7.0        # Yahoo Finance series in utils/macro.py
