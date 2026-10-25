@@ -7,4 +7,5 @@
     correlation  correlation tables, pruning, lead-lag, stability and plots for the macro panels
     notebooks    runs the setup cells of an earlier notebook inside another one
     release_dates  US CPI, payrolls and FOMC release times (`python -m utils.release_dates`)
+    saving       saves the trained models of a notebook in models/<notebook>/ and loads them back
 """

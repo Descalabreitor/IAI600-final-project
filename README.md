@@ -45,6 +45,7 @@ Run them in this order, from the repo root. Each one reads the base data `data/b
 | `classical-models.ipynb` | Every non-neural experiment of the project | ≈ 45 min (16 cores) |
 | `neural-models.ipynb` | Every neural-network experiment, on the same rows and test days | ≈ 33 min (CUDA GPU, RTX 5060 Laptop) |
 | `timestral-zero-shot.ipynb` | Mistral's pretrained Timestral, used zero-shot, on the same rows and test days | ≈ 62 min the first time (CUDA GPU, RTX 5060 Laptop), a few minutes from the cache |
+| `loading-models.ipynb` | How to load each kind of saved model (`models/`) and forecast with it, without training | about a minute (Timestral on a CUDA GPU) |
 
 **`hourly-base-data.ipynb`.** Downloads the pinned Kaggle version and aggregates the minutes into hourly candles, without `dropna()` so the hourly grid stays continuous. It finds that the dataset hides its gaps: a minute without trades is a flat, zero-volume candle at the previous close (95% of 2012, 25–40% of 2013–2016, 1–4% since 2018). That is why the base series starts on 1 Jan 2018. The 15 outages of an hour or more are flagged (`filled_minutes`, `no_trade`), not removed. No split and no scaling: those are model decisions. The other notebooks cut the series at 1 Jan 2020, so the train block (2020–2022) is closer to the test period.
 
@@ -118,6 +119,7 @@ The candidate features of `data-analysis.ipynb` §9 in the models:
 | Path | Content |
 |---|---|
 | `hourly-base-data.ipynb`, `data-analysis.ipynb`, `classical-models.ipynb`, `neural-models.ipynb`, `timestral-zero-shot.ipynb` | The five project notebooks (see above) |
+| `loading-models.ipynb` | Loads the saved models of the notebooks above and forecasts with them (run after them) |
 | `data/btc_hourly.csv.gz` | Base data from 1 Jan 2018: `Open, High, Low, Close, Volume, Return, filled_minutes, no_trade` |
 | `data/binance_BTCUSDT_1h.csv.gz`, `data/binance_ETHUSDT_1h.csv.gz` | Binance hourly candles (17 Aug 2017 → 18 Oct 2026), from `python -m utils.binance` |
 | `data/macro_raw.csv.gz` | Frozen copy of the FRED / Yahoo Finance macro series (written by the first run of `data-analysis.ipynb` §8), so everybody uses the same macro data |
@@ -125,6 +127,7 @@ The candidate features of `data-analysis.ipynb` §9 in the models:
 | `data/features_hourly.csv.gz` | The 19 candidate features of `data-analysis.ipynb` §9, one row per hour from 1 Jan 2020: volatility (`rv_1d`, `rv_7d`, `rv_30d`, `rv_ratio_1d_30d`, `parkinson_1d`, `jump_ratio_1d`), minutes without trades, clock, hour profile of the train block and of the last 90 days (`next_hour_profile_recent`), release hours, hours to / since a release, VIX. Built by `utils/features.py` and checked for lookahead in §9.1; no targets |
 | `data/timestral_cache/` | Cached Timestral forecasts and monthly Gradient Boosting refits of `timestral-zero-shot.ipynb` (local only, rebuilt by the notebook) |
 | `data/btc_hourly_windows.npz`, `data/scaler.joblib` | Windows and scaler of the old data preparation, read only by the archived notebooks |
+| `models/<notebook>/` | The trained models of each notebook (`utils/saving.py`): the final fits used on the test block, the monthly refits for the month after the data, and an `inputs` entry with the columns and scalings they need; `index.json` lists them. `models/<id>/` is the export of `timestral-zero-shot.ipynb` §3.6. Local only (`.gitignore`), rebuilt by the notebooks |
 | `utils/` | Shared helpers imported by the notebooks |
 | `old_notebooks/` | Archived notebooks, superseded by the five above. [Their summary](old_notebooks/README.md) |
 | `Correlation Analyses/` | Macro correlation notebook (data from 2017), its README and results brief (`.docx`) |
@@ -140,6 +143,7 @@ The candidate features of `data-analysis.ipynb` §9 in the models:
 | `utils/correlation.py` | Correlation tables with FDR, pruning, lead-lag, per-year stability, plots | data analysis, correlation |
 | `utils/btc_data.py` | Daily / weekly / monthly BTC frames from the base data (`frames_from_hourly`) or the 1-minute file (`load_btc`) | data analysis, correlation |
 | `utils/notebooks.py` | Runs the setup cells of version 3 inside another notebook | archived `v3-extensions.ipynb` |
+| `utils/saving.py` | Saves the trained models in `models/<notebook>/` (`ModelSaver`; joblib for scikit-learn, `torch.save` of the state_dicts for the networks) and loads them back (`load_model`). `SAVE_MODELS = False` in section 1 of a notebook turns it off | data analysis, classical, neural, Timestral |
 | `utils/release_dates.py` | US CPI, payrolls and FOMC release times with their sources; writes `data/release_dates.csv` | data analysis |
 
 ---

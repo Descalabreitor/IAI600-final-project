@@ -9,3 +9,6 @@ btcusd_1-min_data.csv
 .macro_cache/
 .btc_cache/
 CLAUDE.md
+
+# trained models (utils/saving.py and the Timestral export), rebuilt by the notebooks
+models/
