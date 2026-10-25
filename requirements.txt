@@ -16,4 +16,4 @@ yfinance==1.7.0        # Yahoo Finance series in utils/macro.py
 jinja2                 # DataFrame.style tables: data-analysis, classical-models
 # to run the notebooks
 ipykernel==7.4.0
-nbconvert==7.17.1
+nbconvert==7.17.2
