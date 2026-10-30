@@ -4,64 +4,50 @@
 \section{Experimental Setup}
 \label{sec:setup}
 
-\subsection{Tools and Environment}
+\subsection{Tools}
 \label{sec:tools}
 All code is Python 3.12 with NumPy, pandas, SciPy,
-scikit-learn~\cite{pedregosa2011}, PyTorch~\cite{paszke2019}, the
-\texttt{timestral} package~\cite{timestral} and Matplotlib; versions are
-pinned in \texttt{requirements.txt}. The work consists of five Jupyter
-notebooks (base data, data analysis, classical models, neural networks,
-Timestral) sharing a \texttt{utils} package for the split dates,
-features, metrics and statistical tests. The classical notebook runs in
-about 45 minutes on 16 CPU cores, the neural notebook in 33 minutes and
-the Timestral notebook in under two hours on a laptop GPU (RTX 5060).
-Code: \url{https://github.com/Descalabreitor/IAI600-final-project}.
+scikit-learn~\cite{pedregosa2011}, PyTorch~\cite{paszke2019} and the
+\texttt{timestral} package~\cite{timestral}, in six Jupyter notebooks
+(base data, data analysis, classical models, neural networks, Timestral,
+trading) sharing one \texttt{utils} package. Code:
+\url{https://github.com/Descalabreitor/IAI600-final-project}.
 
-\subsection{Data Split}
+\subsection{Data Split and Model Selection}
 \label{sec:split}
-The data is split into three chronological blocks by the date of the
-predicted hours: \emph{train} Jan 2020 -- Dec 2022 (26{,}304 hours),
-\emph{validation} Jan 2023 -- Jun 2024 (13{,}128) and \emph{test}
-Jul 2024 -- Oct 2026 (19{,}899). A 192-hour purge before each border
-(the 168-hour LSTM window plus the 24 target hours) ensures that no
-target hour of one block lies in the next, so no model is fitted on hours
-it is later scored on~\cite{lopezdeprado2018}; inputs that reach further
-back are legitimate, since they are known at forecast time. Train and
-validation use every sixth origin; the test block uses every origin, and
-daily statistics use one forecast per day at 23:00 (829 independent test
-days).
+Blocks are cut by the date of the predicted hours: \emph{train}
+2020--2022, \emph{validation} Jan 2023 -- Jun 2024 and \emph{test} Jul
+2024 -- Oct 2026. A 192-hour purge before each border keeps every target
+hour in one block only~\cite{lopezdeprado2018}. Every choice (model,
+hyperparameters, features, refit schedule, calibration) is made on train
+and validation; the chosen model is refitted on both and scored once on
+test. Monthly refits and rolling calibration only use outcomes already
+known, as a forecaster in real time would. Hourly targets are tuned on
+validation, daily targets on four walk-forward folds. Models are chosen
+by the metric they are judged on: a model trained for the mean but chosen
+by MAE drifts towards the zero forecast. Networks stop early on the last
+six months of train, never on a random hold-out.
 
-\subsection{Model Selection and Hyperparameter Tuning}
-\label{sec:tuning}
-Every choice (model, hyperparameters, features, refit schedule,
-calibration, Timestral setting) is made on train and validation only; the
-chosen model is refitted on both and scored once on test. Monthly refits
-and rolling calibration are walk-forward: during the test block they use
-an outcome only after it is known, as a forecaster in real time would.
-Hourly targets are tuned on the validation block, daily targets with four
-walk-forward folds over train and validation, which show the true spread
-between periods ($\pm0.08$ $R^2$). Grids are small and extended when the
-best value lies on an edge. The number of boosting trees is tuned
-directly: early stopping on a random hold-out used up to 2.4 times too
-many. Models are selected by the reported metric, which matters for
-returns: a model trained for the mean but chosen by MAE is pushed towards
-the zero forecast. Networks stop early on the last six months of train,
-never on a random hold-out, and are averaged over five seeds.
-
-\subsection{Evaluation Metrics and Baselines}
+\subsection{Metrics and Baselines}
 \label{sec:metrics}
 Returns are scored by the MAE skill against the zero forecast
-($1-\mathrm{MAE}/\mathrm{MAE}_0$), by $\Roos$ (the $R^2$ against the zero
-forecast) and by the information coefficient (IC, the correlation of
-forecast and outcome). Direction is scored by the AUC and by the accuracy
-of the 10\% most confident calls (binomial test); size and volatility by
-$\Rtwo$; ranges by coverage, width and CRPS~\cite{gneiting2007}. The
-$\Rtwo$ of $|\ret|$ has a low ceiling: a single hour's $|\ret|$ is a very
-noisy measure of the volatility behind it, so even a perfect volatility
-forecast explains only part of its variance, and values of 0.1--0.2
-already mean real skill. Baselines are the zero forecast, the reversal of
-the last hour, last week's volatility times the hour profile, and
-``always up''. Uncertainty is measured by a moving-block
-bootstrap~\cite{kunsch1989} over the test days (blocks of 10 days, 1{,}000
-resamples) and Diebold--Mariano tests~\cite{diebold1995}; a difference is
-called \emph{reliable} when its 95\% interval excludes zero.
+($1-\mathrm{MAE}/\mathrm{MAE}_0$) and the information coefficient (IC,
+correlation of forecast and outcome); direction by the AUC; size and
+volatility by $\Rtwo$; ranges by coverage and width. The $\Rtwo$ of
+$|\ret|$ has a low ceiling, since one hour's $|\ret|$ is a very noisy
+measure of the volatility behind it, so 0.1--0.2 is already real skill.
+Baselines are the zero forecast, the reversal of the last hour, last
+week's volatility times the hour profile, and ``always up''. Differences
+are tested with a moving-block bootstrap~\cite{kunsch1989} over the 829
+test days and Diebold--Mariano tests~\cite{diebold1995}; a difference is
+\emph{reliable} when its 95\% interval excludes zero.
+
+\subsection{Trading Simulation}
+\label{sec:trading}
+\$10{,}000 is traded spot, long only above the 50-day mean, with fixed,
+untuned rules. Each day the position is sized so that a bad day (the
+10\% worst case, from the next-day volatility forecast) costs 1.5\% of
+the equity, with a stop and fees of 0.10\% per side. Four flows differ
+only in that forecast: last week's volatility, monthly GB, Timestral and
+their average. We compare money, drawdowns and liquidations when futures
+leverage is set from each forecast at the same average leverage.

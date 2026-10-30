@@ -9,6 +9,7 @@ btcusd_1-min_data.csv
 .macro_cache/
 .btc_cache/
 CLAUDE.md
+IAI600_data-analysis_summary.pdf
 
 # trained models (utils/saving.py and the Timestral export), rebuilt by the notebooks
 models/
