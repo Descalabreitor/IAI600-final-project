@@ -1,0 +1,29 @@
+% ---------------------------------------------------------------------
+%  ABSTRACT
+% ---------------------------------------------------------------------
+\begin{abstract}
+We study how to forecast the 24 hourly price changes of Bitcoin's next
+day from the preceding hourly data. On 59{,}331 consecutive hourly
+Bitstamp candles (January 2020 -- October 2026), we build scale-free
+features, split the data into chronological train, validation and test
+blocks with a purge between them, make every choice without the test
+block, and compare regularised linear models, nearest neighbours, support
+vector machines, tree ensembles, neural networks (MLP, LSTM) and a
+pretrained time-series foundation model (Timestral, zero-shot) against
+simple rules, with block-bootstrap confidence intervals. No model
+forecasts the hourly returns better than ``no change'': at the hourly
+scale Bitcoin behaves like a random walk, and only the next hour carries a
+small reversal signal (AUC 0.538). The \emph{size} of the moves, however,
+is clearly predictable. Gradient Boosting refitted monthly explains
+14.8\% of the variance of each hourly absolute return (2.6 times a
+volatility rule), an LSTM fine-tuned monthly 15.6\%, zero-shot Timestral
+15.7\%, and the average of Timestral and Gradient Boosting 16.4\%.
+Conformally calibrated 80\% ranges cover 80\% of the test hours, and
+next-day volatility is predicted with $R^2 \approx 0.51$. Keeping models
+up to date mattered more than any extra feature or data source.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Bitcoin, time-series forecasting, volatility, gradient boosting,
+conformal prediction, LSTM, foundation models
+\end{IEEEkeywords}

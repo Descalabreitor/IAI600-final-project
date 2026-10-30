@@ -1,0 +1,36 @@
+% ---------------------------------------------------------------------
+%  5  CONCLUSION
+% ---------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+The 24 hourly price changes of Bitcoin's next day cannot be forecast
+better than ``no change'': at the hourly scale the price is close to a
+random walk, and only the next hour carries a small reversal signal (AUC
+0.54). The size of the changes is predictable, so we recommend answering
+the task with the expected size and an 80\% range for each hour. The
+average of zero-shot Timestral and monthly-refitted Gradient Boosting
+explains 16.4\% of the hourly variance (2.9 times a volatility rule), and
+conformally calibrated ranges cover 80\% of the hours, release hours
+included.
+
+We learned that the evaluation design matters more than the choice of
+model: chronological blocks with a purge, choices made without the test
+block, comparison with simple rules and bootstrap intervals are what
+separate a real signal from noise. Recency matters more than data volume
+or extra sources: monthly refits were the largest single gain, while the
+new features, ETH and macro variables added nothing reliable to the size
+forecasts, and Binance order flow only a little to the next-hour
+direction. A pretrained model, used as it comes, can match careful
+feature engineering where there is signal, but cannot create signal where
+there is none.
+
+The study has limitations: a single test period; many tests on the return
+target without a multiple-testing correction; no trading costs in the
+next-hour signal; release hours that remain hard to forecast; and a
+possible overlap between Timestral's training data and our test period.
+Future work includes a rolling-origin evaluation over 2023--2026,
+Holm or Benjamini--Hochberg corrections~\cite{benjamini1995}, a
+cost-aware test of the next-hour signal, a forward test of Timestral on
+data after its release, and a volatility-targeting design tuned on
+validation.
