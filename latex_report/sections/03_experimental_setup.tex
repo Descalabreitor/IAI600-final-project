@@ -1,0 +1,53 @@
+% ---------------------------------------------------------------------
+%  3  EXPERIMENTAL SETUP
+% ---------------------------------------------------------------------
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Tools}
+\label{sec:tools}
+All code is Python 3.12 with NumPy, pandas, SciPy,
+scikit-learn~\cite{pedregosa2011}, PyTorch~\cite{paszke2019} and the
+\texttt{timestral} package~\cite{timestral}, in six Jupyter notebooks
+(base data, data analysis, classical models, neural networks, Timestral,
+trading) sharing one \texttt{utils} package. Code:
+\url{https://github.com/Descalabreitor/IAI600-final-project}.
+
+\subsection{Data Split and Model Selection}
+\label{sec:split}
+Blocks are cut by the date of the predicted hours: \emph{train}
+2020--2022, \emph{validation} Jan 2023 -- Jun 2024 and \emph{test} Jul
+2024 -- Oct 2026. A 192-hour purge before each border keeps every target
+hour in one block only~\cite{lopezdeprado2018}. Every choice (model,
+hyperparameters, features, refit schedule, calibration) is made on train
+and validation; the chosen model is refitted on both and scored once on
+test. Monthly refits and rolling calibration only use outcomes already
+known, as a forecaster in real time would. Hourly targets are tuned on
+validation, daily targets on four walk-forward folds. Models are chosen
+by the metric they are judged on: a model trained for the mean but chosen
+by MAE drifts towards the zero forecast. Networks stop early on the last
+six months of train, never on a random hold-out.
+
+\subsection{Metrics and Baselines}
+\label{sec:metrics}
+Returns are scored by the MAE skill against the zero forecast
+($1-\mathrm{MAE}/\mathrm{MAE}_0$) and the information coefficient (IC,
+correlation of forecast and outcome); direction by the AUC; size and
+volatility by $\Rtwo$; ranges by coverage and width. The $\Rtwo$ of
+$|\ret|$ has a low ceiling, since one hour's $|\ret|$ is a very noisy
+measure of the volatility behind it, so 0.1--0.2 is already real skill.
+Baselines are the zero forecast, the reversal of the last hour, last
+week's volatility times the hour profile, and ``always up''. Differences
+are tested with a moving-block bootstrap~\cite{kunsch1989} over the 829
+test days and Diebold--Mariano tests~\cite{diebold1995}; a difference is
+\emph{reliable} when its 95\% interval excludes zero.
+
+\subsection{Trading Simulation}
+\label{sec:trading}
+\$10{,}000 is traded spot, long only above the 50-day mean, with fixed,
+untuned rules. Each day the position is sized so that a bad day (the
+10\% worst case, from the next-day volatility forecast) costs 1.5\% of
+the equity, with a stop and fees of 0.10\% per side. Four flows differ
+only in that forecast: last week's volatility, monthly GB, Timestral and
+their average. We compare money, drawdowns and liquidations when futures
+leverage is set from each forecast at the same average leverage.

@@ -1,0 +1,32 @@
+% ---------------------------------------------------------------------
+%  5  CONCLUSION
+% ---------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+The analysis of the data decided most of the project: it showed that
+hourly returns are close to a random walk, so the assigned target cannot
+be beaten by any model, and that the size of the moves is persistent,
+clock-driven and drifting, which pointed to scale-free volatility
+features, one row per predicted hour, monthly refits and rolling
+calibration. We therefore recommend answering the task with the expected
+size and an 80\% range for each hour, for which the average of
+Timestral and monthly-refitted Gradient Boosting explains 2.9 times the
+variance of a volatility rule. These forecasts control trading losses,
+not returns.
+
+We learned that the evaluation design matters more than the model:
+chronological blocks with a purge, choices made without the test block,
+simple baselines and bootstrap intervals separate real signal from
+noise. Recency beat data volume and extra sources, and a pretrained
+model, used as it comes, matched careful feature engineering where there
+was signal but could not create signal where there was none.
+
+The study has one test period of 2.25 years, many tests on the returns
+without a multiple-testing correction, release hours that remain hard to
+forecast, and a trading simulation without slippage or funding costs.
+Timestral was released after our test block without listing its
+training series, so its scores may be optimistic. Future work includes
+a rolling-origin evaluation over 2023--2026, a cost-aware test of the
+next-hour signal, a forward test of Timestral, and options, where the
+size of a move pays without its direction.

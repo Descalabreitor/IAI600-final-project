@@ -1,0 +1,143 @@
+% ---------------------------------------------------------------------
+%  2  METHODOLOGY
+%  Sources: hourly-base-data.ipynb, data-analysis.ipynb,
+%           classical-models.ipynb, neural-models.ipynb,
+%           timestral-zero-shot.ipynb, Correlation Analyses/
+% ---------------------------------------------------------------------
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Data and Preparation}
+\label{sec:data}
+The data is the Kaggle ``Bitcoin Historical Data'' set~\cite{kaggle} of
+1-minute Bitstamp BTC/USD candles, pinned to one version and aggregated
+to hourly candles without dropping missing rows, so the hourly grid stays
+continuous. The minute file hides its gaps as flat, zero-volume candles
+at the previous close: 95\% of the minutes of 2012 and 25--40\% of
+2013--2016, but 1--4\% per year since 2018. Outage hours are flagged, not
+removed, and we use the 59{,}331 hours from 1 January 2020 to October
+2026, so that training is close to the current market. Extra inputs were
+tested: Binance BTC and ETH candles with order flow~\cite{binance}, about
+40 macro series from FRED~\cite{fred} and Yahoo Finance, and the times of
+US CPI, payroll and FOMC releases.
+
+\subsection{Exploratory Data Analysis}
+\label{sec:eda}
+Every analysis that could steer a model is fitted on the training block
+and checked on validation. Fig.~\ref{fig:acf} shows the central fact:
+returns are almost uncorrelated (about $-0.03$ at lags 1, 2 and 24; an
+AR(24) model does worse than the mean on validation), while their
+absolute values are strongly autocorrelated (0.30 at lag 1, still 0.10 a
+week later). The direction is almost noise; the size is not. The size
+also follows the clock, and this rhythm drifts (Fig.~\ref{fig:hour}): the
+14~UTC peak of the US session grows from 2022 and jumps after the spot
+ETFs, weekends become calmer, and the average hourly move falls from
+0.50\% in training to about 0.30\% later. US releases move Bitcoin 2--3
+times more than the same hour on other days, whereas ETH and the macro
+variables move together with Bitcoin but never lead it.
+Table~\ref{tab:eda} lists how each finding shaped the modelling.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig_acf_2020_col.png}
+  \caption{Autocorrelation of hourly returns (left) and of their absolute
+  value (right), lags 1--168\,h, training block 2020--2022. Dashed lines:
+  95\% band of white noise.}
+  \label{fig:acf}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.9\columnwidth]{fig_hourprofile_2020.png}
+  \caption{Size of the hourly move by hour of day (UTC), relative to the
+  average hour, before and after the launch of the US spot ETFs.}
+  \label{fig:hour}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{From the data analysis to the modelling choices.}
+\label{tab:eda}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}L{3.3cm}L{4.8cm}@{}}
+\toprule
+Finding & Consequence \\
+\midrule
+Price rose 30-fold; 72\% of test hours above the training range
+  & forecast changes; scale-free features only \\
+Returns almost uncorrelated
+  & ``no change'' as baseline; strong regularisation; add targets the data
+    can answer (size, ranges, next hour) \\
+Size persistent and tied to the clock
+  & volatility and calendar features; one row per predicted hour; trees \\
+Heavy tails (excess kurtosis 55)
+  & quantile ranges; MAE skill; Huber loss for networks \\
+Rhythm and level drift
+  & data from 2020; monthly refits; rolling calibration of ranges \\
+Release hours move 2--3$\times$
+  & release flags; ranges calibrated apart for them \\
+ETH, macro do not lead
+  & tested only as optional inputs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Targets and Features}
+\label{sec:targets}
+A forecast is made at every hour (the \emph{origin}) with 30 days of
+history and 24 target hours. Besides the 24 returns we forecast (a) the
+direction of the next hour, (b) the size $|\ret|$ of each of the next 24
+hours, (c) an 80\% range for each of them and (d) the next day's return,
+direction and volatility. Features are lagged returns, realised
+volatilities over 24--168 hours, high--low ranges, volume ratios and the
+calendar. In the \emph{long format} each origin gives 24 rows, one per
+predicted hour, with columns for that hour (its average size, its size a
+day and a week earlier): one model learns the common structure
+(``volatile weeks make every hour volatile'') from 24 times more rows.
+
+\subsection{Models}
+\label{sec:models}
+\emph{Classical:} Ridge~\cite{hoerl1970}, Lasso~\cite{tibshirani1996},
+ElasticNet~\cite{zou2005}, $k$-nearest neighbours, SVR/SVC, Random
+Forest~\cite{breiman2001}, Extra Trees~\cite{geurts2006} and Gradient
+Boosting (GB)~\cite{friedman2001}, alone and averaged. Ranges come from GB
+quantile regression~\cite{koenker1978} (10\% and 90\%), recalibrated by
+\emph{rolling conformal calibration}~\cite{vovk2005,gibbs2021}: the
+half-width is rescaled so that the last 30 days of known outcomes would
+have had 80\% coverage; the \emph{Mondrian} variant does this separately
+for release hours. Volatility models are also refitted every month on
+all data known by then. \emph{Neural:} MLPs and LSTMs~\cite{hochreiter1997}
+reading a window-normalised 168-hour window; the best LSTM also sees the
+clock and release flags of each predicted hour, weights the week by
+traded volume (attention) and is fine-tuned monthly. \emph{Foundation
+model:} Timestral~\cite{timestral}, pretrained by Mistral AI on mostly
+synthetic series, returns 21 quantiles of each of the next 24 hours. It
+is used zero-shot: we only choose on validation what it reads (series,
+context length, covariates) and its size. Table~\ref{tab:hyper} lists the
+chosen settings.
+
+\begin{table}[t]
+\centering
+\caption{Tuned grids and settings chosen on validation.}
+\label{tab:hyper}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}L{2.0cm}L{6.1cm}@{}}
+\toprule
+Model (target) & Grid $\rightarrow$ chosen \\
+\midrule
+Ridge (returns) & $\alpha \in 0.1$--$10^{9}$ $\rightarrow 10^{5}$
+  (shrinks almost to the zero forecast) \\
+GB (hourly $|\ret|$) & learning rate $\{0.05, 0.1\}$, depth $\{2,3,6\}$
+  $\rightarrow$ 0.1, 6; 1{,}000 rows per leaf \\
+GB (next-day vol.) & learning rate 0.05, depth 2, 200 trees \\
+Monthly refit & expanding, 24-month window, half-life 6/12 months
+  $\rightarrow$ 12 months ($|\ret|$), expanding (daily) \\
+LSTM ($|\ret|$) & 2 layers, hidden $\{32,64,128\} \rightarrow 64$,
+  dropout 0.2, 5 seeds \\
+Timestral & 28M/209M $\rightarrow$ 28M; series $|\ret|$; 180-day
+  context; clock, release calendar, range and volume \\
+\bottomrule
+\end{tabular}
+\end{table}

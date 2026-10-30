@@ -1,0 +1,24 @@
+% ---------------------------------------------------------------------
+%  ABSTRACT
+% ---------------------------------------------------------------------
+\begin{abstract}
+We forecast the 24 hourly price changes of Bitcoin's next day from
+hourly Bitstamp data (2020--2026). An exploratory analysis on the
+training years shows that the direction of hourly moves is almost noise,
+while their size is persistent, follows the clock and drifts over time;
+these findings shape the features, targets and models. With chronological
+blocks, choices made without the test block and comparison against
+simple rules, no model (linear, trees, neural networks or the zero-shot
+foundation model Timestral) beats a forecast of ``no change'' for the
+returns, apart from a small reversal one hour ahead (AUC 0.54). The size
+of each hourly move, however, is predictable: monthly-refitted Gradient
+Boosting reaches $R^2=0.148$, and its average with Timestral 0.164,
+against 0.056 for a volatility rule; recalibrated 80\% ranges keep 80\%
+coverage. In a trading simulation these forecasts do not earn more money
+but make trading safer.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Bitcoin, time-series forecasting, volatility, gradient boosting,
+conformal prediction, LSTM, foundation models
+\end{IEEEkeywords}

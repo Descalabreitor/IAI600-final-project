@@ -1,0 +1,90 @@
+% =====================================================================
+%  IAI600 final project report -- Bitcoin hourly price changes
+%  IEEE two-column conference format (IEEEtran.cls, in TeX Live / Overleaf)
+%
+%  HARD LIMIT: 5 pages INCLUDING references. Check the page count of the
+%  PDF after every larger edit.
+%
+%  Build:  latexmk -pdf main.tex
+%     or:  pdflatex main && pdflatex main
+%  (references are inline in sections/07_references.tex: no BibTeX run)
+%
+%  Rough page budget (two columns):
+%    Title + abstract ............ 0.35
+%    1 Introduction .............. 0.50
+%    2 Methodology ............... 1.25
+%    3 Experimental setup ........ 0.50
+%    4 Results and discussion .... 1.60
+%    5 Conclusion ................ 0.35
+%    Acknowledgment + references . 0.45
+%
+%  Placeholders use \todo{...} (printed in red). Before submission set
+%  \showtodosfalse below, then search the PDF/source for leftovers.
+% =====================================================================
+\documentclass[conference]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\usepackage{xcolor}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+
+% --- placeholders -----------------------------------------------------
+\newif\ifshowtodos
+\showtodostrue   % set to \showtodosfalse for the final version
+\newcommand{\todo}[1]{\ifshowtodos\textcolor{red}{[TODO: #1]}\fi}
+
+% --- notation used throughout ------------------------------------------
+\newcommand{\ret}{r}                          % hourly simple return
+\newcommand{\Rtwo}{R^2}
+\newcommand{\Roos}{R^2_{\mathrm{oos}}}
+
+\begin{document}
+
+\title{Predicting Bitcoin's Hourly Price Changes:\\
+       The Direction Is Noise, the Size Is Not}
+
+\author{
+\IEEEauthorblockN{Alberto Prats}
+\IEEEauthorblockA{\textit{MSc AI, IAI600} \\
+\textit{University West}, Trollh\"attan, Sweden \\
+}
+\and
+\IEEEauthorblockN{Adrián Perera Moreno}
+\IEEEauthorblockA{\textit{MSc AI, IAI600} \\
+\textit{University West}, Trollh\"attan, Sweden \\
+}
+\and
+\IEEEauthorblockN{Filip Botlo}
+\IEEEauthorblockA{\textit{MSc AI, IAI600} \\
+\textit{University West}, Trollh\"attan, Sweden \\
+}
+\and
+\IEEEauthorblockN{Adrián Muñiz Dos Santos}
+\IEEEauthorblockA{\textit{MSc AI, IAI600} \\
+\textit{University West}, Trollh\"attan, Sweden \\
+}
+}
+
+\maketitle
+
+\input{sections/00_abstract}
+\input{sections/01_introduction}
+\input{sections/02_methodology}
+\input{sections/03_experimental_setup}
+\input{sections/04_results}
+\input{sections/05_conclusion}
+\input{sections/06_acknowledgment}
+\input{sections/07_references}
+
+
+
+\end{document}

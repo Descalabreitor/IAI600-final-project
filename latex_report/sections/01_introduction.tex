@@ -1,0 +1,25 @@
+% ---------------------------------------------------------------------
+%  1  INTRODUCTION
+% ---------------------------------------------------------------------
+\section{Introduction}
+\label{sec:intro}
+
+The assigned task is to predict, for each of the 24 hours of the next
+day, how much the price of Bitcoin will change, $\ret_h =
+\mathrm{Close}_h/\mathrm{Close}_{h-1}-1$, from the hours before. Such
+short-horizon forecasts matter for risk management, position sizing and
+the timing of trades. Bitcoin is a demanding case: it trades 24/7, its
+returns are heavy-tailed, and its behaviour shifts between bull and bear
+markets and after events such as the launch of the US spot ETFs in
+January 2024.
+
+Two classical results frame the problem. In an efficient market, past
+prices should not predict the direction of future
+returns~\cite{fama1970}; the size of the moves, on the other hand,
+clusters in time and is predictable~\cite{engle1982,bollerslev1986}.
+Financial time series also make it easy to fool oneself: overlapping
+windows and random splits leak the future into the training
+data~\cite{lopezdeprado2018}. We therefore let a data analysis decide
+which questions are answerable, evaluate every model against a simple
+rule on a test period never used for choices, and finally ask what the
+forecasts are worth to a trader.
