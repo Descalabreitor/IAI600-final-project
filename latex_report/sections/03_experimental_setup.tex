@@ -21,12 +21,15 @@ Blocks are cut by the date of the predicted hours: \emph{train}
 hour in one block only~\cite{lopezdeprado2018}. Every choice (model,
 hyperparameters, features, refit schedule, calibration) is made on train
 and validation; the chosen model is refitted on both and scored once on
-test. Monthly refits and rolling calibration only use outcomes already
-known, as a forecaster in real time would. Hourly targets are tuned on
-validation, daily targets on four walk-forward folds. Models are chosen
-by the metric they are judged on: a model trained for the mean but chosen
-by MAE drifts towards the zero forecast. Networks stop early on the last
-six months of train, never on a random hold-out.
+test. Test scores use every hourly origin; the 829 forecasts made at
+23:00, which share no target hour, give the daily targets and every
+significance test. Monthly refits and rolling calibration only use
+outcomes already known, as a forecaster in real time would. Hourly
+targets are tuned on validation, daily targets on four walk-forward
+folds. Models are chosen by the metric they are judged on: a model
+trained for the mean but chosen by MAE drifts towards the zero forecast.
+Networks stop early on the last six months of train, never on a random
+hold-out.
 
 \subsection{Metrics and Baselines}
 \label{sec:metrics}
@@ -35,9 +38,12 @@ Returns are scored by the MAE skill against the zero forecast
 correlation of forecast and outcome); direction by the AUC; size and
 volatility by $\Rtwo$; ranges by coverage and width. The $\Rtwo$ of
 $|\ret|$ has a low ceiling, since one hour's $|\ret|$ is a very noisy
-measure of the volatility behind it, so 0.1--0.2 is already real skill.
+measure of the volatility behind it~\cite{andersen1998}, so 0.1--0.2 is
+already real skill; squared error still ranks forecasts correctly
+against such a proxy~\cite{patton2011}.
 Baselines are the zero forecast, the reversal of the last hour, last
-week's volatility times the hour profile, and ``always up''. Differences
+week's volatility times the hour profile (of the training block or of
+the last 90 days), and ``always up''. Differences
 are tested with a moving-block bootstrap~\cite{kunsch1989} over the 829
 test days and Diebold--Mariano tests~\cite{diebold1995}; a difference is
 \emph{reliable} when its 95\% interval excludes zero.
@@ -49,5 +55,11 @@ untuned rules. Each day the position is sized so that a bad day (the
 10\% worst case, from the next-day volatility forecast) costs 1.5\% of
 the equity, with a stop and fees of 0.10\% per side. Four flows differ
 only in that forecast: last week's volatility, monthly GB, Timestral and
-their average. We compare money, drawdowns and liquidations when futures
-leverage is set from each forecast at the same average leverage.
+their average. We compare money, the Sharpe ratio (mean over standard
+deviation of daily returns, compared by a paired block bootstrap) and
+drawdowns (falls from the previous equity peak); the chance of a
+drawdown above 20\% within a year comes from 5{,}000 years resampled in
+20-day blocks. As a stress test, futures leverage is set daily from each
+forecast at the same average leverage, high enough for liquidations
+(a fall of about $1/k$ below the entry at leverage $k$, measured on
+hourly lows) to occur.

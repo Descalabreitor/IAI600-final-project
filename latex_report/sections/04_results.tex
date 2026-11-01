@@ -30,7 +30,7 @@ Direction of the next hour & GB classifier
   & last-hour reversal: AUC 0.528 & yes, small \\
 Size $|\ret|$ of each next hour & Timestral + GB refitted monthly
   & $\Rtwo = \mathbf{0.164}$ (Timestral 0.157, LSTM 0.156, GB 0.148)
-  & last week $\times$ hour profile: 0.056 & yes \\
+  & last week $\times$ recent (90-day) hour profile: 0.072 & yes \\
 80\% range for each next hour & GB quantile + rolling Mondrian conformal
   & coverage 80.0\% (calm 78\%, wild 82\%, release hours 82\%), width
     0.98\%
@@ -68,19 +68,21 @@ correct signs.
 The size is where the models have clear skill (Fig.~\ref{fig:size}). The
 long format was the largest modelling gain (validation $\Rtwo$ 0.052 to
 0.097). On test, GB fitted once explains 13.1\% of the variance of each
-hourly $|\ret|$, more than twice the volatility rule. Refitting every
-month raises it to 14.8\% ($+0.017$ $[+0.010, +0.024]$): in a drifting
-market, keeping the model current is worth more than any extra input.
-None of the candidate features from the analysis, nor Binance and ETH,
-improved the trees, because recent volatility and the clock already carry
-their information. Release hours stay under-predicted: with a few
-hundred training rows they are fewer than one leaf of the tuned GB.
+hourly $|\ret|$, almost twice the best simple rule (0.072). Refitting
+every month raises it to 14.8\% ($+0.017$ $[+0.010, +0.024]$): in a
+drifting market, keeping the model current is worth more than any extra
+input. None of the candidate features from the analysis, nor Binance and
+ETH, improved the trees, because recent volatility and the clock already
+carry their information. Release hours stay under-predicted (forecast
+about $0.65\times$ their actual size): with a few hundred training rows
+they are fewer than one leaf of the tuned GB.
 
 Networks needed the same knowledge to compete: an LSTM gains $+0.031$
 when told the clock and release flags of the hour it predicts (what the
 per-hour columns do for the trees), and with volume attention and
-monthly fine-tuning reaches 0.156, narrowly above GB. Timestral, never
-trained on our data, matches it (0.157), provided it reads $|\ret|$
+monthly fine-tuning reaches 0.156, narrowly above GB ($+0.008$ $[+0.001,
++0.015]$). Timestral, never trained on our data, matches it (0.157),
+provided it reads $|\ret|$
 rather than $\ret$, a long (180-day) context and the release calendar;
 the 209M model added almost nothing over the 28M one. The plain average
 of Timestral and GB is the best result (0.164, $+0.016$ $[+0.013,

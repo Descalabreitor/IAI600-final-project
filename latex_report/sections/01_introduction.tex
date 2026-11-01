@@ -6,7 +6,9 @@
 
 The assigned task is to predict, for each of the 24 hours of the next
 day, how much the price of Bitcoin will change, $\ret_h =
-\mathrm{Close}_h/\mathrm{Close}_{h-1}-1$, from the hours before. Such
+\mathrm{Close}_h/\mathrm{Close}_{h-1}-1$, from the hours before. We
+make this forecast from every hour, for the 24 hours that follow; the
+next day is the case of the forecast made at 23:00. Such
 short-horizon forecasts matter for risk management, position sizing and
 the timing of trades. Bitcoin is a demanding case: it trades 24/7, its
 returns are heavy-tailed, and its behaviour shifts between bull and bear
@@ -23,3 +25,18 @@ data~\cite{lopezdeprado2018}. We therefore let a data analysis decide
 which questions are answerable, evaluate every model against a simple
 rule on a test period never used for choices, and finally ask what the
 forecasts are worth to a trader.
+
+\emph{Related work.} Machine-learning studies of Bitcoin report
+direction accuracies of only 52--56\%, for daily
+moves~\cite{mcnally2018} and for horizons of 1 to 60
+minutes~\cite{jaquart2021}, and the trading profits of the latter
+vanish after transaction costs. Volatility, by contrast, is usually
+forecast well from its own recent averages over several
+horizons~\cite{corsi2009}. Deep forecasters built on MLP, recurrent,
+convolutional and Transformer backbones are reviewed and benchmarked
+in~\cite{wang2024deep}, which points to pretrained foundation models as
+the next step: Chronos~\cite{ansari2024chronos},
+TimesFM~\cite{das2024timesfm} and Moirai~\cite{woo2024moirai} forecast
+unseen series zero-shot, and Timestral~\cite{timestral} belongs to this
+line. We compare all three families on the same data and blocks, for
+the direction and for the size of the moves.

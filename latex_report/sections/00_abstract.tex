@@ -13,11 +13,12 @@ foundation model Timestral) beats a forecast of ``no change'' for the
 returns, apart from a small reversal one hour ahead (AUC 0.54). The size
 of each hourly move, however, is predictable: monthly-refitted Gradient
 Boosting reaches $R^2=0.148$, and its average with Timestral 0.164,
-against 0.056 for a volatility rule; recalibrated 80\% ranges keep 80\%
-coverage. In a trading simulation these forecasts do not earn more money
-but make trading safer.
+against 0.072 for the best simple rule; recalibrated 80\% ranges keep
+80\% coverage, and next-day volatility reaches $R^2=0.51$ against 0.09.
+In a trading simulation these forecasts do not earn more money but make
+trading safer.
+ Code: \url{https://github.com/Descalabreitor/IAI600-final-project}.
 \end{abstract}
-
 \begin{IEEEkeywords}
 Bitcoin, time-series forecasting, volatility, gradient boosting,
 conformal prediction, LSTM, foundation models

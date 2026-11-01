@@ -108,11 +108,14 @@ half-width is rescaled so that the last 30 days of known outcomes would
 have had 80\% coverage; the \emph{Mondrian} variant does this separately
 for release hours. Volatility models are also refitted every month on
 all data known by then. \emph{Neural:} MLPs and LSTMs~\cite{hochreiter1997}
-reading a window-normalised 168-hour window; the best LSTM also sees the
+reading a 168-hour window normalised by its own statistics, the
+stationarisation step common to deep forecasters~\cite{wang2024deep};
+the best LSTM also sees the
 clock and release flags of each predicted hour, weights the week by
 traded volume (attention) and is fine-tuned monthly. \emph{Foundation
 model:} Timestral~\cite{timestral}, pretrained by Mistral AI on mostly
-synthetic series, returns 21 quantiles of each of the next 24 hours. It
+synthetic series (real ones enter only in a second training stage),
+returns 21 quantiles of each of the next 24 hours. It
 is used zero-shot: we only choose on validation what it reads (series,
 context length, covariates) and its size. Table~\ref{tab:hyper} lists the
 chosen settings.
